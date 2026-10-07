@@ -23,10 +23,20 @@ app.include_router(bge_small_intent_embed.router)  # POST /bge-small-intent-embe
 
 
 @app.get("/playground", include_in_schema=False)
-async def playground():
-    return FileResponse(BASE_DIR / "playground.html")
+async def playground_tool():
+    return FileResponse(BASE_DIR / "playground_tool.html")
+
+
+@app.get("/playground/intent", include_in_schema=False)
+async def playground_intent():
+    return FileResponse(BASE_DIR / "playground_intent.html")
 
 
 @app.get("/playground/examples", include_in_schema=False)
 async def playground_examples():
     return FileResponse(BASE_DIR / "prompt_intent_examples.json")
+
+
+@app.get("/playground/questions", include_in_schema=False)
+async def playground_questions():
+    return FileResponse(BASE_DIR / "questions_jev_open_router_tool.json")
