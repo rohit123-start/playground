@@ -1,0 +1,12 @@
+Start the server:
+  python -m uvicorn main:app --port 8000
+
+POST /jev-open-router-tool -> typesafe/jev through the OpenRouter Decisions API
+  body: {"user_query": "..."}
+  returns: {"tools_selected": [{"tool": "web_search", "score": 0.96}]}
+
+# bash
+curl -X POST http://localhost:8000/jev-open-router-tool -H "Content-Type: application/json" -d '{"user_query": "who won the Lakers game last night"}'
+
+# PowerShell
+Invoke-RestMethod -Method Post -Uri http://localhost:8000/jev-open-router-tool -ContentType "application/json" -Body '{"user_query": "who won the Lakers game last night"}' | ConvertTo-Json -Depth 5

@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tool Selector Playground</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --text: #1c1c1a; --muted: #6b6b66; --line: #e2e2dd;
+    --accent: #2f5fd0; --accent-text: #ffffff; --good: #1f7a45; --bad: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --card: #1e1e1c; --text: #ecece8; --muted: #9a9a93; --line: #34342f;
+      --accent: #6c93f0; --accent-text: #10131a; --good: #5fd08a; --bad: #f2877f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; font-weight: 600; margin-bottom: 8px; }
+  textarea { width: 100%; min-height: 84px; resize: vertical; padding: 10px 12px; font: inherit;
+             color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+  button.primary { background: var(--accent); color: var(--accent-text); border: 0; border-radius: 8px;
+                   padding: 9px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.primary:disabled { opacity: .6; cursor: default; }
+  .hint { color: var(--muted); font-size: 13px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+  .tab { border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 999px;
+         padding: 3px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+  .tab[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; max-height: 132px; overflow: auto; }
+  .chip { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 6px;
+          padding: 3px 9px; font: inherit; font-size: 13px; cursor: pointer; text-align: left; }
+  .chip:hover { border-color: var(--accent); }
+  .meta { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+  .meta b { color: var(--text); }
+  .tool { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+  .tool:first-of-type { border-top: 0; }
+  .tool code { font-weight: 600; }
+  .bar { flex: 1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--good); }
+  .none { color: var(--muted); font-style: italic; }
+  .err { color: var(--bad); white-space: pre-wrap; word-break: break-word; }
+  pre { margin: 0; padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+        overflow: auto; font-size: 13px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 16px 0 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-top: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; border-top: 0; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tool Selector Playground</h1>
+  <p class="sub">Sends a prompt to <code>POST /jev-open-router-tool</code> and shows what comes back.</p>
+
+  <div class="card">
+    <label for="q">Prompt</label>
+    <textarea id="q" placeholder="e.g. who won the Lakers game last night"></textarea>
+    <div class="row">
+      <button class="primary" id="send">Send</button>
+      <span class="hint">Ctrl/Cmd + Enter to send</span>
+    </div>
+  </div>
+
+  <div class="card" id="examples-card" hidden>
+    <label>Example prompts</label>
+    <div class="tabs" id="tabs"></div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="card" id="result" hidden>
+    <div class="meta" id="meta"></div>
+    <div id="tools"></div>
+    <h2>Raw response</h2>
+    <pre id="raw"></pre>
+  </div>
+
+  <div class="card" id="history-card" hidden>
+    <label>History</label>
+    <table>
+      <thead><tr><th>Prompt</th><th>Selected</th><th>Latency</th></tr></thead>
+      <tbody id="history"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+  const ROUTE = "/jev-open-router-tool";
+  const $ = (id) => document.getElementById(id);
+  const q = $("q"), send = $("send");
+
+  function el(tag, props = {}, ...kids) {
+    const n = Object.assign(document.createElement(tag), props);
+    n.append(...kids);
+    return n;
+  }
+
+  async function run() {
+    const text = q.value.trim();
+    if (!text) { q.focus(); return; }
+    send.disabled = true; send.textContent = "Sending…";
+    const start = performance.now();
+    let status = 0, body = null, errText = null;
+    try {
+      const r = await fetch(ROUTE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_query: text }),
+      });
+      status = r.status;
+      const raw = await r.text();
+      try { body = JSON.parse(raw); } catch { errText = raw; }
+    } catch (e) {
+      errText = String(e);
+    }
+    const ms = Math.round(performance.now() - start);
+    render(text, status, body, errText, ms);
+    send.disabled = false; send.textContent = "Send";
+  }
+
+  function render(text, status, body, errText, ms) {
+    $("result").hidden = false;
+    const ok = status === 200 && body && Array.isArray(body.tools_selected);
+    $("meta").replaceChildren(
+      el("span", {}, "Status ", el("b", {}, status || "network error")),
+      el("span", {}, "Latency ", el("b", {}, ms + " ms")),
+    );
+    const tools = $("tools");
+    tools.replaceChildren();
+    if (!ok) {
+      const detail = body && body.detail ? (typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail)) : errText;
+      tools.append(el("div", { className: "err" }, detail || "Request failed"));
+    } else if (body.tools_selected.length === 0) {
+      tools.append(el("div", { className: "none" }, "No tool selected"));
+    } else {
+      for (const t of body.tools_selected) {
+        const bar = el("div", { className: "bar" }, el("i"));
+        bar.firstChild.style.width = Math.round(t.score * 100) + "%";
+        tools.append(el("div", { className: "tool" },
+          el("code", {}, t.tool), bar, el("span", { className: "hint" }, t.score.toFixed(4))));
+      }
+    }
+    $("raw").textContent = body ? JSON.stringify(body, null, 2) : (errText || "");
+
+    $("history-card").hidden = false;
+    const label = !ok ? "error" : body.tools_selected.length ? body.tools_selected.map(t => t.tool).join(", ") : "no tool";
+    $("history").prepend(el("tr", {},
+      el("td", {}, text), el("td", {}, label), el("td", { className: "num" }, ms + " ms")));
+  }
+
+  send.addEventListener("click", run);
+  q.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") run(); });
+
+  // Example prompts come from prompt_intent_examples.json (served at /playground/examples).
+  fetch("/playground/examples").then(r => r.ok ? r.json() : null).then((data) => {
+    if (!data || !data.intents) return;
+    const intents = Object.keys(data.intents);
+    $("examples-card").hidden = false;
+    const show = (name) => {
+      for (const b of $("tabs").children) b.setAttribute("aria-pressed", String(b.dataset.name === name));
+      $("chips").replaceChildren(...data.intents[name].map((p) =>
+        el("button", { className: "chip", type: "button", onclick: () => { q.value = p; q.focus(); } }, p)));
+    };
+    for (const name of intents) {
+      const b = el("button", { className: "tab", type: "button", onclick: () => show(name) },
+        `${name} (${data.intents[name].length})`);
+      b.dataset.name = name;
+      $("tabs").append(b);
+    }
+    show(intents[0]);
+  }).catch(() => {});
+</script>
+</body>
+</html>
