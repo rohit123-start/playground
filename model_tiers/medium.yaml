@@ -1,0 +1,469 @@
+# MEDIUM tier only
+tasks:
+  general:
+    - question
+    - explain
+    - brainstorm
+    - summarize
+    - overview
+    - advice
+  coding:
+    - code
+    - bug
+    - debug
+    - refactor
+    - function
+    - error
+    - stack trace
+  frontend:
+    - ui
+    - landing page
+    - website
+    - component
+    - react
+    - html css
+    - tailwind
+    - dashboard ui
+    - responsive layout
+  agentic:
+    - multi-step task
+    - use tools
+    - browse
+    - automate
+    - workflow
+    - call api
+    - run commands
+    - do it for me
+  systems:
+    - architecture
+    - system design
+    - distributed system
+    - concurrency
+    - race condition
+    - deadlock
+    - scalability
+  analysis:
+    - analyze
+    - evaluate
+    - trade-offs
+    - multi-step
+    - reasoning
+    - plan
+  writing:
+    - essay
+    - email
+    - rewrite
+    - edit text
+    - blog post
+  creative:
+    - story
+    - screenplay
+    - dialogue
+    - roleplay
+    - character
+  research:
+    - latest
+    - news
+    - sources
+    - compare prices
+  math:
+    - proof
+    - equation
+    - olympiad
+    - derive
+  multimodal:
+    - image
+    - photo
+    - video
+    - audio
+    - screenshot
+  long_docs:
+    - long document
+    - transcript
+    - contract
+    - uploaded file
+    - paper
+  chinese:
+    - chinese
+    - 中文
+    - translate to chinese
+    - bilingual
+  extraction:
+    - classify
+    - extract
+    - tag
+    - label
+    - high volume
+  image_generation:
+    - generate image
+    - create image
+    - draw
+    - illustration
+    - logo
+    - poster
+  image_editing:
+    - edit image
+    - edit photo
+    - remove background
+    - replace object
+    - change the style of this image
+    - retouch
+    - inpaint
+    - extend image
+  video_generation:
+    - generate video
+    - create video
+    - animate
+    - clip
+    - motion
+  video_editing:
+    - edit video
+    - edit this clip
+    - change the video
+    - restyle video
+    - remove from video
+    - replace in video
+  audio_generation:
+    - text to speech
+    - voiceover
+    - narrate
+    - music
+    - song
+  audio_editing:
+    - edit song
+    - change part of a song
+    - replace a section
+    - edit this track
+
+models:
+  # ---------- General (7) ----------
+  gpt-6.1-sol:
+    tier: medium
+    features:
+      thinking: always-on
+      deep_thinking: true
+    handles:
+      - general
+      - coding
+      - frontend
+      - agentic
+      - analysis
+      - writing
+      - multimodal
+      - long_docs
+    difficulty: complex
+    best_for:
+      - everyday coding
+      - agentic workflows
+      - computer use
+
+  gpt-5.6-terra:
+    tier: medium
+    features:
+      thinking: true
+      deep_thinking: true
+    handles:
+      - general
+      - writing
+      - multimodal
+      - long_docs
+    difficulty: moderate
+    best_for:
+      - business process automation
+      - document and knowledge-base analysis
+      - 1M-token context
+
+  claude-sonnet-5-5:
+    tier: medium
+    features:
+      thinking: adaptive
+      deep_thinking: true
+    handles:
+      - general
+      - coding
+      - frontend
+      - agentic
+      - writing
+      - multimodal
+      - long_docs
+    difficulty: moderate
+    best_for:
+      - best speed-intelligence balance
+      - everyday coding and writing
+
+  gemini-3.1-pro-preview:
+    tier: medium
+    features:
+      thinking: always-on
+      deep_thinking: false
+    handles:
+      - general
+      - coding
+      - frontend
+      - analysis
+      - multimodal
+      - long_docs
+    difficulty: complex
+    best_for:
+      - software engineering
+      - precise multi-step tool use
+
+  grok-4.7:
+    tier: medium
+    features:
+      thinking: always-on
+      deep_thinking: true
+    handles:
+      - general
+      - coding
+      - agentic
+      - systems
+      - writing
+      - multimodal
+    difficulty: complex
+    best_for:
+      - coding
+      - agentic tasks
+      - long projects
+      - 500K context
+
+  qwen3.8-max-0902:
+    tier: medium
+    features:
+      thinking: true
+      deep_thinking: true
+    handles:
+      - general
+      - coding
+      - frontend
+      - agentic
+      - systems
+      - writing
+      - multimodal
+      - long_docs
+      - chinese
+    difficulty: complex
+    best_for:
+      - multi-day autonomous projects
+      - complex coding workflows
+      - UI prototyping
+
+  glm-5.3:
+    tier: medium
+    features:
+      thinking: always-on
+      deep_thinking: true
+    handles:
+      - general
+      - coding
+      - frontend
+      - agentic
+      - systems
+      - long_docs
+      - chinese
+    difficulty: moderate
+    best_for:
+      - multi-file repo changes
+      - long-horizon coding agents
+      - defensive security
+
+  # ---------- Code-only (1) ----------
+  gpt-5.3-codex:
+    tier: medium
+    features:
+      thinking: true
+      deep_thinking: true
+    handles:
+      - coding
+      - frontend
+      - agentic
+      - analysis
+      - multimodal
+    difficulty: moderate
+    best_for:
+      - agentic coding
+
+  # ---------- Search / Research (1) ----------
+  perplexity-sonar-reasoning-pro:
+    tier: medium
+    features:
+      thinking: true
+      deep_thinking: true
+    handles:
+      - research
+      - analysis
+    difficulty: moderate
+    best_for:
+      - research needing reasoning
+      - analytical answers with citations
+
+  # ---------- Image (4) ----------
+  gpt-image-2.5-sunburst:
+    tier: medium
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - image_generation
+      - image_editing
+    difficulty: complex
+    best_for:
+      - premium multi-turn editing
+      - complex layouts
+      - reference fidelity
+
+  gpt-image-2.5-flare:
+    tier: medium
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - image_generation
+      - image_editing
+    difficulty: moderate
+    best_for:
+      - fast everyday image generation
+      - high-volume images
+
+  gemini-3.1-flash-image:
+    tier: medium
+    features:
+      thinking: true
+      deep_thinking: false
+    handles:
+      - image_generation
+      - image_editing
+    difficulty: complex
+    best_for:
+      - fast high-quality images
+      - multilingual text in images
+      - up to 4K
+
+  qwen-image-3.0-pro:
+    tier: medium
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - image_generation
+      - image_editing
+    difficulty: complex
+    best_for:
+      - reference-based editing
+      - high-resolution output
+      - infographics and dense layouts
+
+  # ---------- Video (7) ----------
+  wan3.0-video:
+    tier: medium
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - video_generation
+    difficulty: complex
+    best_for:
+      - long clips up to 30s
+      - reference-consistent characters
+
+  seedance-2.0:
+    tier: medium
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - video_generation
+      - video_editing
+    difficulty: complex
+    best_for:
+      - up to 4K video
+      - lip-synced dialogue
+      - multi-reference scenes
+
+  seedance-2-fast:
+    tier: medium
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - video_generation
+      - video_editing
+    difficulty: moderate
+    best_for:
+      - fast 720p production clips
+
+  kling-v3.0-pro:
+    tier: medium
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - video_generation
+    difficulty: complex
+    best_for:
+      - multi-shot storyboards
+      - cinematic 1080p scenes
+
+  kling-v3.0-turbo:
+    tier: medium
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - video_generation
+    difficulty: moderate
+    best_for:
+      - fast Kling 3.0 generation
+      - multi-shot prompts up to 6 shots
+      - 720p and 1080p clips up to 15s
+
+  kling-v3.0-motion-control:
+    tier: medium
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - video_generation
+    difficulty: complex
+    best_for:
+      - precise camera paths
+      - choreographed motion
+
+  runway-gen-4.5:
+    tier: medium
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - video_generation
+    difficulty: complex
+    best_for:
+      - cinematic motion and lighting
+      - animating a still image
+
+  # ---------- Audio (2) ----------
+  elevenlabs-v2.5-turbo:
+    tier: medium
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - audio_generation
+    difficulty: simple
+    best_for:
+      - low-latency conversational voice
+
+  lyria-3.5:
+    tier: medium
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - audio_generation
+    difficulty: complex
+    best_for:
+      - music generation
+      - stable production music
+      - songs and soundtracks
+
+# Tasks with no model in this tier: creative, math, extraction, audio_editing

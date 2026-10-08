@@ -1,0 +1,361 @@
+# HIGH tier only
+tasks:
+  general:
+    - question
+    - explain
+    - brainstorm
+    - summarize
+    - overview
+    - advice
+  coding:
+    - code
+    - bug
+    - debug
+    - refactor
+    - function
+    - error
+    - stack trace
+  frontend:
+    - ui
+    - landing page
+    - website
+    - component
+    - react
+    - html css
+    - tailwind
+    - dashboard ui
+    - responsive layout
+  agentic:
+    - multi-step task
+    - use tools
+    - browse
+    - automate
+    - workflow
+    - call api
+    - run commands
+    - do it for me
+  systems:
+    - architecture
+    - system design
+    - distributed system
+    - concurrency
+    - race condition
+    - deadlock
+    - scalability
+  analysis:
+    - analyze
+    - evaluate
+    - trade-offs
+    - multi-step
+    - reasoning
+    - plan
+  writing:
+    - essay
+    - email
+    - rewrite
+    - edit text
+    - blog post
+  creative:
+    - story
+    - screenplay
+    - dialogue
+    - roleplay
+    - character
+  research:
+    - latest
+    - news
+    - sources
+    - compare prices
+  math:
+    - proof
+    - equation
+    - olympiad
+    - derive
+  multimodal:
+    - image
+    - photo
+    - video
+    - audio
+    - screenshot
+  long_docs:
+    - long document
+    - transcript
+    - contract
+    - uploaded file
+    - paper
+  chinese:
+    - chinese
+    - 中文
+    - translate to chinese
+    - bilingual
+  extraction:
+    - classify
+    - extract
+    - tag
+    - label
+    - high volume
+  image_generation:
+    - generate image
+    - create image
+    - draw
+    - illustration
+    - logo
+    - poster
+  image_editing:
+    - edit image
+    - edit photo
+    - remove background
+    - replace object
+    - change the style of this image
+    - retouch
+    - inpaint
+    - extend image
+  video_generation:
+    - generate video
+    - create video
+    - animate
+    - clip
+    - motion
+  video_editing:
+    - edit video
+    - edit this clip
+    - change the video
+    - restyle video
+    - remove from video
+    - replace in video
+  audio_generation:
+    - text to speech
+    - voiceover
+    - narrate
+    - music
+    - song
+  audio_editing:
+    - edit song
+    - change part of a song
+    - replace a section
+    - edit this track
+
+models:
+  # ---------- General (5) ----------
+  gpt-6-astra:
+    tier: high
+    features:
+      thinking: always-on
+      deep_thinking: true
+    handles:
+      - general
+      - coding
+      - frontend
+      - agentic
+      - systems
+      - analysis
+      - writing
+      - multimodal
+      - long_docs
+    difficulty: complex
+    best_for:
+      - long tool-heavy agent runs
+      - high-stakes complex work
+      - large migrations
+
+  gpt-5.5-pro:
+    tier: high
+    features:
+      thinking: always-on
+      deep_thinking: true
+    handles:
+      - general
+      - coding
+      - frontend
+      - agentic
+      - systems
+      - analysis
+      - writing
+      - multimodal
+      - long_docs
+    difficulty: complex
+    best_for:
+      - hardest reasoning problems
+      - accuracy over speed
+
+  gpt-5.5:
+    tier: high
+    features:
+      thinking: true
+      deep_thinking: true
+    handles:
+      - general
+      - coding
+      - frontend
+      - agentic
+      - analysis
+      - writing
+      - multimodal
+      - long_docs
+    difficulty: moderate
+    best_for:
+      - coding
+      - tool-heavy agents
+      - long-context retrieval
+      - polished customer-facing answers
+
+  claude-opus-5-5:
+    tier: high
+    features:
+      thinking: adaptive
+      deep_thinking: true
+    handles:
+      - general
+      - coding
+      - frontend
+      - agentic
+      - systems
+      - analysis
+      - writing
+      - multimodal
+      - long_docs
+    difficulty: complex
+    best_for:
+      - long-running agentic coding
+      - knowledge work
+
+  kimi-k3:
+    tier: high
+    features:
+      thinking: true
+      deep_thinking: true
+    handles:
+      - general
+      - coding
+      - frontend
+      - agentic
+      - systems
+      - writing
+      - multimodal
+      - long_docs
+      - chinese
+    difficulty: complex
+    best_for:
+      - coding
+      - knowledge work
+      - long documents and repos
+
+  # ---------- Search / Research (3) ----------
+  perplexity-sonar-pro:
+    tier: high
+    features:
+      thinking: true
+      deep_thinking: true
+    handles:
+      - research
+    difficulty: moderate
+    best_for:
+      - complex multi-source queries
+
+  perplexity-sonar-pro-search:
+    tier: high
+    features:
+      thinking: true
+      deep_thinking: false
+    handles:
+      - research
+    difficulty: moderate
+    best_for:
+      - multi-step search with tools
+
+  perplexity-sonar-deep-research:
+    tier: high
+    features:
+      thinking: always-on
+      deep_thinking: true
+    handles:
+      - research
+      - analysis
+    difficulty: complex
+    best_for:
+      - exhaustive research reports
+
+  # ---------- Image (1) ----------
+  gemini-3-pro-image:
+    tier: high
+    features:
+      thinking: true
+      deep_thinking: false
+    handles:
+      - image_generation
+      - image_editing
+    difficulty: complex
+    best_for:
+      - legible text in images
+      - heavy reference handling
+      - production assets
+
+  # ---------- Video (2) ----------
+  veo-3.1-generate-preview:
+    tier: high
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - video_generation
+    difficulty: complex
+    best_for:
+      - premium cinematic clips
+      - synced dialogue audio
+      - final deliverables
+
+  runway-aleph-2:
+    tier: high
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - video_editing
+    difficulty: complex
+    best_for:
+      - edits on clips up to 30s at 1080p
+      - multi-shot consistent edits
+      - product swaps, relighting, restyles
+
+  # ---------- Audio (3) ----------
+  elevenlabs-music-v2:
+    tier: high
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - audio_generation
+      - audio_editing
+    difficulty: complex
+    best_for:
+      - full songs with vocals
+      - genre switching
+      - commercial use
+
+  qwen-audio-3.0-tts-plus:
+    tier: high
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - audio_generation
+    difficulty: complex
+    best_for:
+      - studio-quality narration
+      - audiobooks and voice broadcasting
+      - virtual avatars
+
+  lyria-3-pro-preview:
+    tier: high
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - audio_generation
+    difficulty: complex
+    best_for:
+      - high-quality full-length music
+      - premium soundtracks
+      - detailed musical control
+
+# Tasks with no model in this tier: creative, math, extraction

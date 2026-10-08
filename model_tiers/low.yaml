@@ -1,0 +1,527 @@
+# LOW tier only
+tasks:
+  general:
+    - question
+    - explain
+    - brainstorm
+    - summarize
+    - overview
+    - advice
+  coding:
+    - code
+    - bug
+    - debug
+    - refactor
+    - function
+    - error
+    - stack trace
+  frontend:
+    - ui
+    - landing page
+    - website
+    - component
+    - react
+    - html css
+    - tailwind
+    - dashboard ui
+    - responsive layout
+  agentic:
+    - multi-step task
+    - use tools
+    - browse
+    - automate
+    - workflow
+    - call api
+    - run commands
+    - do it for me
+  systems:
+    - architecture
+    - system design
+    - distributed system
+    - concurrency
+    - race condition
+    - deadlock
+    - scalability
+  analysis:
+    - analyze
+    - evaluate
+    - trade-offs
+    - multi-step
+    - reasoning
+    - plan
+  writing:
+    - essay
+    - email
+    - rewrite
+    - edit text
+    - blog post
+  creative:
+    - story
+    - screenplay
+    - dialogue
+    - roleplay
+    - character
+  research:
+    - latest
+    - news
+    - sources
+    - compare prices
+  math:
+    - proof
+    - equation
+    - olympiad
+    - derive
+  multimodal:
+    - image
+    - photo
+    - video
+    - audio
+    - screenshot
+  long_docs:
+    - long document
+    - transcript
+    - contract
+    - uploaded file
+    - paper
+  chinese:
+    - chinese
+    - 中文
+    - translate to chinese
+    - bilingual
+  extraction:
+    - classify
+    - extract
+    - tag
+    - label
+    - high volume
+  image_generation:
+    - generate image
+    - create image
+    - draw
+    - illustration
+    - logo
+    - poster
+  image_editing:
+    - edit image
+    - edit photo
+    - remove background
+    - replace object
+    - change the style of this image
+    - retouch
+    - inpaint
+    - extend image
+  video_generation:
+    - generate video
+    - create video
+    - animate
+    - clip
+    - motion
+  video_editing:
+    - edit video
+    - edit this clip
+    - change the video
+    - restyle video
+    - remove from video
+    - replace in video
+  audio_generation:
+    - text to speech
+    - voiceover
+    - narrate
+    - music
+    - song
+  audio_editing:
+    - edit song
+    - change part of a song
+    - replace a section
+    - edit this track
+
+models:
+  # ---------- General (10) ----------
+  gpt-6-luna:
+    tier: low
+    features:
+      thinking: true
+      deep_thinking: true
+    handles:
+      - general
+      - extraction
+      - multimodal
+      - long_docs
+    difficulty: simple
+    best_for:
+      - high-volume focused tasks
+      - classification and extraction
+      - many parallel sub-agents
+
+  gpt-6-luna-fast:
+    tier: low
+    features:
+      thinking: true
+      deep_thinking: true
+    handles:
+      - general
+      - extraction
+      - long_docs
+    difficulty: simple
+    best_for:
+      - lowest-latency Luna responses
+      - real-time high-volume tasks
+      - fast classification and extraction
+
+  gpt-5.4-mini:
+    tier: low
+    features:
+      thinking: true
+      deep_thinking: false
+    handles:
+      - general
+      - analysis
+      - writing
+      - multimodal
+    difficulty: moderate
+    best_for:
+      - cost-sensitive low-latency workloads
+
+  claude-haiku-4-5:
+    tier: low
+    features:
+      thinking: true
+      deep_thinking: false
+    handles:
+      - general
+      - coding
+      - multimodal
+    difficulty: simple
+    best_for:
+      - fastest near-frontier answers
+      - low-latency tasks
+
+  gemini-3.8-flash:
+    tier: low
+    features:
+      thinking: always-on
+      deep_thinking: false
+    handles:
+      - general
+      - coding
+      - analysis
+      - multimodal
+      - long_docs
+    difficulty: moderate
+    best_for:
+      - end-to-end engineering tasks
+      - multi-step STEM reasoning
+      - finance and legal analysis
+
+  qwen3.8-flash:
+    tier: low
+    features:
+      thinking: true
+      deep_thinking: true
+    handles:
+      - general
+      - coding
+      - multimodal
+      - long_docs
+      - chinese
+    difficulty: simple
+    best_for:
+      - multimodal agents
+      - visual coding
+      - visual perception
+
+  glm-5.3-flash:
+    tier: low
+    features:
+      thinking: always-on
+      deep_thinking: true
+    handles:
+      - general
+      - coding
+      - multimodal
+      - long_docs
+      - chinese
+    difficulty: simple
+    best_for:
+      - visual coding
+      - fast multimodal agents
+      - browser and document workflows
+
+  deepseek-v4.1-flash:
+    tier: low
+    features:
+      thinking: true
+      deep_thinking: true
+    handles:
+      - general
+      - math
+      - multimodal
+      - long_docs
+      - chinese
+    difficulty: simple
+    best_for:
+      - fast cheap coding
+      - long-context retrieval
+      - math reasoning
+
+  deepseek-v4.1-flash-fast:
+    tier: low
+    features:
+      thinking: true
+      deep_thinking: true
+    handles:
+      - general
+      - math
+      - multimodal
+      - long_docs
+      - chinese
+    difficulty: simple
+    best_for:
+      - fastest v4.1-flash responses
+      - low-latency math and long-context
+      - real-time cheap answers
+
+  deepseek-v4-pro-0813:
+    tier: low
+    features:
+      thinking: true
+      deep_thinking: true
+    handles:
+      - general
+      - coding
+      - math
+      - long_docs
+      - chinese
+    difficulty: moderate
+    best_for:
+      - complex agent workflows
+      - deep reasoning
+      - hard programming
+
+  # ---------- Code-only (1) ----------
+  qwen3-coder-next:
+    tier: low
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - coding
+    difficulty: moderate
+    best_for:
+      - cheap agentic coding
+      - local or IDE coding agents
+
+  # ---------- Search / Research (2) ----------
+  perplexity-sonar:
+    tier: low
+    features:
+      thinking: true
+      deep_thinking: true
+    handles:
+      - research
+    difficulty: simple
+    best_for:
+      - quick web-grounded answers
+
+  perplexity-search:
+    tier: low
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - research
+    difficulty: simple
+    best_for:
+      - raw ranked web results
+      - lowest-latency search
+
+  # ---------- Image (5) ----------
+  gemini-3.1-flash-lite-image:
+    tier: low
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - image_generation
+      - image_editing
+    difficulty: simple
+    best_for:
+      - quick local edits
+      - thumbnails and drafts
+      - 1K only
+
+  grok-imagine-image:
+    tier: low
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - image_generation
+      - image_editing
+    difficulty: simple
+    best_for:
+      - fast cheap images
+      - mockups and social graphics
+
+  wan2.7-image:
+    tier: low
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - image_generation
+      - image_editing
+    difficulty: complex
+    best_for:
+      - text in 12 languages
+      - multi-reference editing
+      - brand color control
+
+  flux-2-turbo:
+    tier: low
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - image_generation
+      - image_editing
+    difficulty: moderate
+    best_for:
+      - fast drafts
+      - prompt iteration
+      - quick edits
+
+  qwen-image-3.0:
+    tier: low
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - image_generation
+      - image_editing
+    difficulty: moderate
+    best_for:
+      - legible small text in images
+      - unified generation and editing
+      - cheap everyday images
+
+  # ---------- Video (6) ----------
+  veo-3.1-fast-generate-001:
+    tier: low
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - video_generation
+    difficulty: moderate
+    best_for:
+      - production clips at 1080p
+      - iteration with audio
+
+  veo-3.1-lite-generate-preview:
+    tier: low
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - video_generation
+    difficulty: simple
+    best_for:
+      - cheap prototypes
+      - high-volume previews
+
+  gemini-omni-1.1-flash:
+    tier: low
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - video_generation
+      - video_editing
+    difficulty: moderate
+    best_for:
+      - scene extension
+      - first-last-frame transitions
+      - cheap 360p drafts
+
+  grok-imagine-video:
+    tier: low
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - video_generation
+      - video_editing
+    difficulty: simple
+    best_for:
+      - short social clips
+      - image-to-video
+      - video edits
+
+  seedance-2.0-mini:
+    tier: low
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - video_generation
+      - video_editing
+    difficulty: simple
+    best_for:
+      - cheap high-volume clips
+      - e-commerce and UGC
+
+  kling-v3.0-std:
+    tier: low
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - video_generation
+    difficulty: moderate
+    best_for:
+      - cheaper Kling 3.0 clips
+      - text-to-video and image-to-video
+      - first and last frame control
+
+  # ---------- Audio (3) ----------
+  gemini-3.8-flash-tts:
+    tier: low
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - audio_generation
+    difficulty: complex
+    best_for:
+      - audiobooks and narration
+      - multi-speaker dialogue
+      - 130 languages
+
+  gemini-3.8-flash-lite-tts:
+    tier: low
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - audio_generation
+    difficulty: simple
+    best_for:
+      - real-time voice agents
+      - read-aloud
+      - high volume
+
+  qwen-audio-3.0-tts-flash:
+    tier: low
+    features:
+      thinking: false
+      deep_thinking: false
+    handles:
+      - audio_generation
+    difficulty: simple
+    best_for:
+      - real-time voice under 200ms
+      - Chinese dialects and low-resource languages
+      - emotion and tone control
+
+# Tasks with no model in this tier: frontend, agentic, systems, creative, audio_editing

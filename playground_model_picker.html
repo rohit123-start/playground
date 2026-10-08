@@ -1,9 +1,9 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Qwen Intent Playground</title>
+<title>Model Picker Playground</title>
 <style>
   :root {
     --bg: #f7f7f5; --card: #ffffff; --text: #1c1c1a; --muted: #6b6b66; --line: #e2e2dd;
@@ -35,6 +35,8 @@
   .tab { border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 999px;
          padding: 3px 12px; font: inherit; font-size: 13px; cursor: pointer; }
   .tab[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .seg { display: flex; gap: 6px; }
+  .seg .tab { padding: 6px 20px; font-size: 14px; text-transform: capitalize; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; max-height: 132px; overflow: auto; }
   .chip { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 6px;
           padding: 3px 9px; font: inherit; font-size: 13px; cursor: pointer; text-align: left; }
@@ -43,12 +45,11 @@
   .meta b { color: var(--text); }
   .tool { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
   .tool:first-of-type { border-top: 0; }
-  .tool code { font-weight: 600; }
+  .tool code { font-weight: 600; min-width: 0; overflow-wrap: anywhere; flex: 0 1 230px; }
   .bar { flex: 1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
   .bar > i { display: block; height: 100%; background: var(--good); }
-  .intent { font-size: 26px; font-weight: 700; margin: 0 0 4px; }
+  .intent { font-size: 26px; font-weight: 700; margin: 0 0 4px; overflow-wrap: anywhere; }
   .example { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
-  .none { color: var(--muted); font-style: italic; }
   .err { color: var(--bad); white-space: pre-wrap; word-break: break-word; }
   pre { margin: 0; padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
         overflow: auto; font-size: 13px; }
@@ -57,7 +58,7 @@
   th, td { text-align: left; padding: 6px 8px; border-top: 1px solid var(--line); }
   th { color: var(--muted); font-weight: 600; border-top: 0; }
   td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .nav { display: flex; gap: 6px; margin-bottom: 20px; }
+  .nav { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
   .nav a { border: 1px solid var(--line); color: var(--text); border-radius: 999px; padding: 4px 14px;
            font-size: 13px; text-decoration: none; }
   .nav a[aria-current="page"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
@@ -69,17 +70,19 @@
     <a href="/playground">Tool selection</a>
     <a href="/playground/intent">Intent (bge-small)</a>
     <a href="/playground/voyage">Intent (voyage)</a>
-    <a href="/playground/qwen" aria-current="page">Intent (qwen 4b)</a>
+    <a href="/playground/qwen">Intent (qwen 4b)</a>
     <a href="/playground/qwen8b">Intent (qwen 8b)</a>
     <a href="/playground/prompt-scan">Prompt scan (JEV)</a>
-    <a href="/playground/model-picker">Model picker (JEV)</a>
+    <a href="/playground/model-picker" aria-current="page">Model picker (JEV)</a>
   </nav>
-  <h1>Qwen Intent Playground</h1>
-  <p class="sub">Sends a prompt to <code>POST /qwen-intent-embed</code> (qwen/qwen3-embedding-4b via OpenRouter) and shows the detected intent.</p>
+  <h1>Model Picker Playground</h1>
+  <p class="sub">Sends a prompt to <code id="route-label"></code> (typesafe/jev via OpenRouter). JEV picks the task, then the best model in the chosen tier that handles it.</p>
 
   <div class="card">
-    <label for="q">Prompt</label>
-    <textarea id="q" placeholder="e.g. who won the Lakers game last night"></textarea>
+    <label id="tier-label">Sub category</label>
+    <div class="seg" id="tiers" role="group" aria-labelledby="tier-label"></div>
+    <label for="q" style="margin-top:16px">Prompt</label>
+    <textarea id="q" placeholder="e.g. generate a logo for my coffee shop"></textarea>
     <div class="row">
       <button class="primary" id="send">Send</button>
       <span class="hint">Ctrl/Cmd + Enter to send</span>
@@ -96,14 +99,13 @@
   <div class="card" id="history-card" hidden>
     <label>History</label>
     <table>
-      <thead><tr><th>Prompt</th><th>Intent</th><th>Latency</th></tr></thead>
+      <thead><tr><th>Prompt</th><th>Tier</th><th>Task</th><th>Model</th><th>Latency</th></tr></thead>
       <tbody id="history"></tbody>
     </table>
   </div>
 
-  <div class="card" id="examples-card" hidden>
+  <div class="card">
     <label>Example prompts</label>
-    <div class="tabs" id="tabs"></div>
     <div class="chips" id="chips"></div>
   </div>
 </main>
@@ -111,17 +113,20 @@
 <script>
   // Relative URLs only parse when served over http(s); fall back to the local server if opened as a file.
   const BASE = location.protocol.startsWith("http") ? "" : "http://localhost:8000";
-  const ROUTE = BASE + "/qwen-intent-embed";
-  const isValid = (b) => typeof b.intent === "string";
-  // Renders the response; returns the label for the history table.
-  function show(out, body) {
-    out.append(el("div", { className: "intent" }, body.intent),
-               el("div", { className: "example" }, "closest example: \u201c" + body.matched_example + "\u201d"));
-    for (const [name, score] of Object.entries(body.scores)) out.append(scoreBar(name, score));
-    return body.intent + " (" + body.score.toFixed(2) + ")";
-  }
+  const TIERS = ["low", "medium", "high"];
+  const routeFor = (tier) => "/jev-model-picker-" + tier;
+  const EXAMPLES = [
+    "Explain how a hash map works", "Fix this stack trace from my Node server",
+    "Build a responsive landing page with Tailwind", "Prove that the square root of 2 is irrational",
+    "Draft a polite email asking for a deadline extension", "What is the latest news on the EU AI Act?",
+    "Generate a logo for my coffee shop", "Remove the background from this photo",
+    "Create a 10 second cinematic video of a city at night", "Narrate this chapter as an audiobook",
+    "Design a distributed rate limiter that scales", "Extract all invoice numbers from these 5,000 emails",
+  ];
+  const isValid = (b) => typeof b.model === "string" && b.task && Array.isArray(b.candidates);
   const $ = (id) => document.getElementById(id);
   const q = $("q"), send = $("send");
+  let tier = "low";
 
   function el(tag, props = {}, ...kids) {
     const n = Object.assign(document.createElement(tag), props);
@@ -140,14 +145,35 @@
     return d ? (typeof d === "string" ? d : JSON.stringify(d)) : (errText || "Request failed");
   }
 
+  // Renders the response; returns [task, model] for the history table.
+  function show(out, body) {
+    out.append(el("h2", {}, "Selected model"),
+               el("div", { className: "intent" }, body.model),
+               el("div", { className: "example" }, "task: " + body.task.choice +
+                 " (confidence " + (body.task.confidence ?? "n/a") + ")"));
+    out.append(el("h2", {}, "Candidates for this task"));
+    for (const c of body.candidates) out.append(scoreBar(c.model, c.probability));
+    out.append(el("h2", {}, "Task probabilities"));
+    const tasks = Object.entries(body.task.probabilities).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    for (const [name, p] of tasks) out.append(scoreBar(name, p));
+    return [body.task.choice, body.model];
+  }
+
+  function setTier(t) {
+    tier = t;
+    for (const b of $("tiers").children) b.setAttribute("aria-pressed", String(b.dataset.tier === t));
+    $("route-label").textContent = "POST " + routeFor(t);
+  }
+
   async function run() {
     const text = q.value.trim();
     if (!text) { q.focus(); return; }
-    send.disabled = true; send.textContent = "Sending\u2026";
+    const useTier = tier;
+    send.disabled = true; send.textContent = "Sending…";
     const start = performance.now();
     let status = 0, body = null, errText = null;
     try {
-      const r = await fetch(ROUTE, {
+      const r = await fetch(BASE + routeFor(useTier), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_query: text }),
@@ -161,7 +187,8 @@
     const ms = Math.round(performance.now() - start);
     $("result").hidden = false;
     const ok = status === 200 && body && isValid(body);
-    const meta = [el("span", {}, "Status ", el("b", {}, status || "network error")),
+    const meta = [el("span", {}, "Tier ", el("b", {}, useTier)),
+                  el("span", {}, "Status ", el("b", {}, status || "network error")),
                   el("span", {}, "Round trip ", el("b", {}, ms + " ms"))];
     if (ok && body.latency_ms !== undefined) meta.push(el("span", {}, "Server ", el("b", {}, body.latency_ms + " ms")));
     $("meta").replaceChildren(...meta);
@@ -170,39 +197,28 @@
     let label;
     if (!ok) {
       out.append(el("div", { className: "err" }, errorText(body, errText)));
-      label = "error";
+      label = ["error", ""];
     } else {
       label = show(out, body);
     }
     $("raw").textContent = body ? JSON.stringify(body, null, 2) : (errText || "");
     $("history-card").hidden = false;
-    $("history").prepend(el("tr", {}, el("td", {}, text), el("td", {}, label),
-                                      el("td", { className: "num" }, ms + " ms")));
+    $("history").prepend(el("tr", {}, el("td", {}, text), el("td", {}, useTier), el("td", {}, label[0]),
+                                      el("td", {}, label[1]), el("td", { className: "num" }, ms + " ms")));
     send.disabled = false; send.textContent = "Send";
   }
 
+  for (const t of TIERS) {
+    const b = el("button", { className: "tab", type: "button", onclick: () => setTier(t) }, t);
+    b.dataset.tier = t;
+    $("tiers").append(b);
+  }
+  setTier("low");
+  $("chips").replaceChildren(...EXAMPLES.map((p) =>
+    el("button", { className: "chip", type: "button", onclick: () => { q.value = p; q.focus(); } }, p)));
+
   send.addEventListener("click", run);
   q.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") run(); });
-
-  // Example prompts come from prompt_intent_examples.json (served at /playground/examples).
-  fetch(BASE + "/playground/examples").then(r => r.ok ? r.json() : null).then((data) => {
-    if (!data || !data.intents) return;
-    const intents = Object.keys(data.intents);
-    $("examples-card").hidden = false;
-    const showIntent = (name) => {
-      for (const b of $("tabs").children) b.setAttribute("aria-pressed", String(b.dataset.name === name));
-      $("chips").replaceChildren(...data.intents[name].map((p) =>
-        el("button", { className: "chip", type: "button", onclick: () => { q.value = p; q.focus(); } }, p)));
-    };
-    for (const name of intents) {
-      const b = el("button", { className: "tab", type: "button", onclick: () => showIntent(name) },
-        `${name} (${data.intents[name].length})`);
-      b.dataset.name = name;
-      $("tabs").append(b);
-    }
-    showIntent(intents[0]);
-  }).catch(() => {});
 </script>
 </body>
 </html>
-

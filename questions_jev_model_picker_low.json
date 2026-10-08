@@ -1,0 +1,56 @@
+{
+  "task": {
+    "type": "choice",
+    "instructions": "Which single task category best matches what the user is asking for?",
+    "criteria": {
+      "general": "Request involves: question, explain, brainstorm, summarize, overview, advice.",
+      "coding": "Request involves: code, bug, debug, refactor, function, error, stack trace.",
+      "analysis": "Request involves: analyze, evaluate, trade-offs, multi-step, reasoning, plan.",
+      "writing": "Request involves: essay, email, rewrite, edit text, blog post.",
+      "research": "Request involves: latest, news, sources, compare prices. Needs fresh or web-sourced information with sources.",
+      "math": "Request involves: proof, equation, olympiad, derive.",
+      "multimodal": "Request involves: image, photo, video, audio, screenshot. Understanding or analyzing an existing image, photo, video, audio or screenshot the user provides.",
+      "long_docs": "Request involves: long document, transcript, contract, uploaded file, paper. Working over a long or uploaded document, transcript, contract or paper.",
+      "chinese": "Request involves: chinese, 中文, translate to chinese, bilingual.",
+      "extraction": "Request involves: classify, extract, tag, label, high volume. Classifying, extracting, tagging or labeling content, often in high volume.",
+      "image_generation": "Request involves: generate image, create image, draw, illustration, logo, poster. Creating a brand-new image from a description.",
+      "image_editing": "Request involves: edit image, edit photo, remove background, replace object, change the style of this image, retouch, inpaint, extend image. Modifying an existing image.",
+      "video_generation": "Request involves: generate video, create video, animate, clip, motion. Creating a brand-new video from a description or image.",
+      "video_editing": "Request involves: edit video, edit this clip, change the video, restyle video, remove from video, replace in video. Modifying an existing video clip.",
+      "audio_generation": "Request involves: text to speech, voiceover, narrate, music, song. Creating speech, narration, music or songs."
+    }
+  },
+  "model": {
+    "type": "choice",
+    "instructions": "Which model is the best fit for this request, considering the task, how difficult it is, and whether it needs reasoning?",
+    "criteria": {
+      "gpt-6-luna": "Handles: general, extraction, multimodal, long_docs. Difficulty: simple. Thinking: true, deep thinking: true. Best for: high-volume focused tasks; classification and extraction; many parallel sub-agents.",
+      "gpt-6-luna-fast": "Handles: general, extraction, long_docs. Difficulty: simple. Thinking: true, deep thinking: true. Best for: lowest-latency Luna responses; real-time high-volume tasks; fast classification and extraction.",
+      "gpt-5.4-mini": "Handles: general, analysis, writing, multimodal. Difficulty: moderate. Thinking: true, deep thinking: false. Best for: cost-sensitive low-latency workloads.",
+      "claude-haiku-4-5": "Handles: general, coding, multimodal. Difficulty: simple. Thinking: true, deep thinking: false. Best for: fastest near-frontier answers; low-latency tasks.",
+      "gemini-3.8-flash": "Handles: general, coding, analysis, multimodal, long_docs. Difficulty: moderate. Thinking: always-on, deep thinking: false. Best for: end-to-end engineering tasks; multi-step STEM reasoning; finance and legal analysis.",
+      "qwen3.8-flash": "Handles: general, coding, multimodal, long_docs, chinese. Difficulty: simple. Thinking: true, deep thinking: true. Best for: multimodal agents; visual coding; visual perception.",
+      "glm-5.3-flash": "Handles: general, coding, multimodal, long_docs, chinese. Difficulty: simple. Thinking: always-on, deep thinking: true. Best for: visual coding; fast multimodal agents; browser and document workflows.",
+      "deepseek-v4.1-flash": "Handles: general, math, multimodal, long_docs, chinese. Difficulty: simple. Thinking: true, deep thinking: true. Best for: fast cheap coding; long-context retrieval; math reasoning.",
+      "deepseek-v4.1-flash-fast": "Handles: general, math, multimodal, long_docs, chinese. Difficulty: simple. Thinking: true, deep thinking: true. Best for: fastest v4.1-flash responses; low-latency math and long-context; real-time cheap answers.",
+      "deepseek-v4-pro-0813": "Handles: general, coding, math, long_docs, chinese. Difficulty: moderate. Thinking: true, deep thinking: true. Best for: complex agent workflows; deep reasoning; hard programming.",
+      "qwen3-coder-next": "Handles: coding. Difficulty: moderate. Thinking: false, deep thinking: false. Best for: cheap agentic coding; local or IDE coding agents.",
+      "perplexity-sonar": "Handles: research. Difficulty: simple. Thinking: true, deep thinking: true. Best for: quick web-grounded answers.",
+      "perplexity-search": "Handles: research. Difficulty: simple. Thinking: false, deep thinking: false. Best for: raw ranked web results; lowest-latency search.",
+      "gemini-3.1-flash-lite-image": "Handles: image_generation, image_editing. Difficulty: simple. Thinking: false, deep thinking: false. Best for: quick local edits; thumbnails and drafts; 1K only.",
+      "grok-imagine-image": "Handles: image_generation, image_editing. Difficulty: simple. Thinking: false, deep thinking: false. Best for: fast cheap images; mockups and social graphics.",
+      "wan2.7-image": "Handles: image_generation, image_editing. Difficulty: complex. Thinking: false, deep thinking: false. Best for: text in 12 languages; multi-reference editing; brand color control.",
+      "flux-2-turbo": "Handles: image_generation, image_editing. Difficulty: moderate. Thinking: false, deep thinking: false. Best for: fast drafts; prompt iteration; quick edits.",
+      "qwen-image-3.0": "Handles: image_generation, image_editing. Difficulty: moderate. Thinking: false, deep thinking: false. Best for: legible small text in images; unified generation and editing; cheap everyday images.",
+      "veo-3.1-fast-generate-001": "Handles: video_generation. Difficulty: moderate. Thinking: false, deep thinking: false. Best for: production clips at 1080p; iteration with audio.",
+      "veo-3.1-lite-generate-preview": "Handles: video_generation. Difficulty: simple. Thinking: false, deep thinking: false. Best for: cheap prototypes; high-volume previews.",
+      "gemini-omni-1.1-flash": "Handles: video_generation, video_editing. Difficulty: moderate. Thinking: false, deep thinking: false. Best for: scene extension; first-last-frame transitions; cheap 360p drafts.",
+      "grok-imagine-video": "Handles: video_generation, video_editing. Difficulty: simple. Thinking: false, deep thinking: false. Best for: short social clips; image-to-video; video edits.",
+      "seedance-2.0-mini": "Handles: video_generation, video_editing. Difficulty: simple. Thinking: false, deep thinking: false. Best for: cheap high-volume clips; e-commerce and UGC.",
+      "kling-v3.0-std": "Handles: video_generation. Difficulty: moderate. Thinking: false, deep thinking: false. Best for: cheaper Kling 3.0 clips; text-to-video and image-to-video; first and last frame control.",
+      "gemini-3.8-flash-tts": "Handles: audio_generation. Difficulty: complex. Thinking: false, deep thinking: false. Best for: audiobooks and narration; multi-speaker dialogue; 130 languages.",
+      "gemini-3.8-flash-lite-tts": "Handles: audio_generation. Difficulty: simple. Thinking: false, deep thinking: false. Best for: real-time voice agents; read-aloud; high volume.",
+      "qwen-audio-3.0-tts-flash": "Handles: audio_generation. Difficulty: simple. Thinking: false, deep thinking: false. Best for: real-time voice under 200ms; Chinese dialects and low-resource languages; emotion and tone control."
+    }
+  }
+}
