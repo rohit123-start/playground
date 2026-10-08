@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Voyage Intent Playground</title>
+<title>Prompt Scan Playground</title>
 <style>
   :root {
     --bg: #f7f7f5; --card: #ffffff; --text: #1c1c1a; --muted: #6b6b66; --line: #e2e2dd;
@@ -68,17 +68,17 @@
   <nav class="nav">
     <a href="/playground">Tool selection</a>
     <a href="/playground/intent">Intent (bge-small)</a>
-    <a href="/playground/voyage" aria-current="page">Intent (voyage)</a>
+    <a href="/playground/voyage">Intent (voyage)</a>
     <a href="/playground/qwen">Intent (qwen 4b)</a>
     <a href="/playground/qwen8b">Intent (qwen 8b)</a>
-    <a href="/playground/prompt-scan">Prompt scan (JEV)</a>
+    <a href="/playground/prompt-scan" aria-current="page">Prompt scan (JEV)</a>
   </nav>
-  <h1>Voyage Intent Playground</h1>
-  <p class="sub">Sends a prompt to <code>POST /voyage-intent-embed</code> (voyageai/voyage-4-lite via OpenRouter) and shows the detected intent.</p>
+  <h1>Prompt Scan Playground</h1>
+  <p class="sub">Sends a prompt to <code>POST /jev-prompt-scan-open-router</code> (typesafe/jev via OpenRouter). Two independent decisions: model/tool routing and context routing.</p>
 
   <div class="card">
     <label for="q">Prompt</label>
-    <textarea id="q" placeholder="e.g. who won the Lakers game last night"></textarea>
+    <textarea id="q" placeholder="e.g. summarize the PDF I uploaded"></textarea>
     <div class="row">
       <button class="primary" id="send">Send</button>
       <span class="hint">Ctrl/Cmd + Enter to send</span>
@@ -95,7 +95,7 @@
   <div class="card" id="history-card" hidden>
     <label>History</label>
     <table>
-      <thead><tr><th>Prompt</th><th>Intent</th><th>Latency</th></tr></thead>
+      <thead><tr><th>Prompt</th><th>Model</th><th>Context</th><th>Latency</th></tr></thead>
       <tbody id="history"></tbody>
     </table>
   </div>
@@ -110,14 +110,20 @@
 <script>
   // Relative URLs only parse when served over http(s); fall back to the local server if opened as a file.
   const BASE = location.protocol.startsWith("http") ? "" : "http://localhost:8000";
-  const ROUTE = BASE + "/voyage-intent-embed";
-  const isValid = (b) => typeof b.intent === "string";
-  // Renders the response; returns the label for the history table.
+  const ROUTE = BASE + "/jev-prompt-scan-open-router";
+  const isValid = (b) => b.model_routing && b.context_routing;
+  // Renders the response; returns [model, context] labels for the history table.
+  function decisionBlock(title, d) {
+    const wrap = el("div", {}, el("h2", {}, title),
+      el("div", { className: "intent" }, d.choice),
+      el("div", { className: "example" }, "confidence " + (d.confidence ?? "n/a")));
+    for (const [name, p] of Object.entries(d.probabilities)) wrap.append(scoreBar(name, p));
+    return wrap;
+  }
   function show(out, body) {
-    out.append(el("div", { className: "intent" }, body.intent),
-               el("div", { className: "example" }, "closest example: \u201c" + body.matched_example + "\u201d"));
-    for (const [name, score] of Object.entries(body.scores)) out.append(scoreBar(name, score));
-    return body.intent + " (" + body.score.toFixed(2) + ")";
+    out.append(decisionBlock("Model / tool routing", body.model_routing),
+               decisionBlock("Context routing", body.context_routing));
+    return [body.model_routing.choice, body.context_routing.choice];
   }
   const $ = (id) => document.getElementById(id);
   const q = $("q"), send = $("send");
@@ -169,13 +175,13 @@
     let label;
     if (!ok) {
       out.append(el("div", { className: "err" }, errorText(body, errText)));
-      label = "error";
+      label = ["error", ""];
     } else {
       label = show(out, body);
     }
     $("raw").textContent = body ? JSON.stringify(body, null, 2) : (errText || "");
     $("history-card").hidden = false;
-    $("history").prepend(el("tr", {}, el("td", {}, text), el("td", {}, label),
+    $("history").prepend(el("tr", {}, el("td", {}, text), el("td", {}, label[0]), el("td", {}, label[1]),
                                       el("td", { className: "num" }, ms + " ms")));
     send.disabled = false; send.textContent = "Send";
   }
@@ -183,24 +189,24 @@
   send.addEventListener("click", run);
   q.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") run(); });
 
-  // Example prompts come from prompt_intent_examples.json (served at /playground/examples).
-  fetch(BASE + "/playground/examples").then(r => r.ok ? r.json() : null).then((data) => {
-    if (!data || !data.intents) return;
-    const intents = Object.keys(data.intents);
-    $("examples-card").hidden = false;
-    const showIntent = (name) => {
-      for (const b of $("tabs").children) b.setAttribute("aria-pressed", String(b.dataset.name === name));
-      $("chips").replaceChildren(...data.intents[name].map((p) =>
-        el("button", { className: "chip", type: "button", onclick: () => { q.value = p; q.focus(); } }, p)));
-    };
-    for (const name of intents) {
-      const b = el("button", { className: "tab", type: "button", onclick: () => showIntent(name) },
-        `${name} (${data.intents[name].length})`);
-      b.dataset.name = name;
-      $("tabs").append(b);
-    }
-    showIntent(intents[0]);
-  }).catch(() => {});
+  const EXAMPLES = {
+    "default + no context": ["Explain what a mutex is", "Write a haiku about autumn"],
+    "default + context": ["Summarize what we discussed earlier", "Fix the bug in the code I pasted above"],
+    "specific + no context": ["Search the web for today's top tech news", "Generate an image of a red fox in snow"],
+    "specific + context": ["Run the attached CSV through a Python script and plot it", "Transcribe the audio file I uploaded"],
+  };
+  $("examples-card").hidden = false;
+  const showGroup = (name) => {
+    for (const b of $("tabs").children) b.setAttribute("aria-pressed", String(b.dataset.name === name));
+    $("chips").replaceChildren(...EXAMPLES[name].map((p) =>
+      el("button", { className: "chip", type: "button", onclick: () => { q.value = p; q.focus(); } }, p)));
+  };
+  for (const name of Object.keys(EXAMPLES)) {
+    const b = el("button", { className: "tab", type: "button", onclick: () => showGroup(name) }, name);
+    b.dataset.name = name;
+    $("tabs").append(b);
+  }
+  showGroup(Object.keys(EXAMPLES)[0]);
 </script>
 </body>
 </html>

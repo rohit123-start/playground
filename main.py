@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 
 import bge_small_intent_embed
 import jev_ai
+import jev_prompt_scan
 import qwen8b_intent_embed
 import qwen_intent_embed
 import voyage_intent_embed
@@ -39,6 +40,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Tool Selector", lifespan=lifespan)
 app.include_router(jev_ai.router)  # POST /jev-open-router-     
+app.include_router(jev_prompt_scan.router)  # POST /jev-prompt-scan-open-router
 app.include_router(bge_small_intent_embed.router)  # POST /bge-small-intent-embed
 app.include_router(voyage_intent_embed.router)  # POST /voyage-intent-embed
 app.include_router(qwen_intent_embed.router)  # POST /qwen-intent-embed
@@ -68,6 +70,11 @@ async def playground_qwen():
 @app.get("/playground/qwen8b", include_in_schema=False)
 async def playground_qwen8b():
     return FileResponse(BASE_DIR / "playground_qwen8b.html")
+
+
+@app.get("/playground/prompt-scan", include_in_schema=False)
+async def playground_prompt_scan():
+    return FileResponse(BASE_DIR / "playground_prompt_scan.html")
 
 
 @app.get("/playground/examples", include_in_schema=False)

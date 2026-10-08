@@ -21,8 +21,8 @@ OPENROUTER_MODEL = os.getenv("JEV_OPEN_ROUTER_AI_MODEL")  # OpenRouter model id
 THRESHOLD = float(os.getenv("DECIDER_THRESHOLD", "0.65"))
 
 # Native noul/choice questions for the OpenRouter Decisions API.
-with open(Path(__file__).with_name("questions_jev_open_router_tool.json"), encoding="utf-8") as f:
-    questions = json.load(f)
+_QUESTIONS_FILE = Path(__file__).with_name("questions_jev_open_router_tool.json")
+questions = json.loads(_QUESTIONS_FILE.read_text(encoding="utf-8")) if _QUESTIONS_FILE.exists() else {}
 
 
 def _probability(answer) -> float | None:
