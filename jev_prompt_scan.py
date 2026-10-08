@@ -42,13 +42,14 @@ questions = {
         "instructions": "Does this request require additional context?",
         "criteria": {
             "context_yes": (
-                "The request requires information from uploaded files, previous conversation, "
-                "memory, provided data, or other external context. Choose context_yes only when "
-                "the user explicitly requires information from an external or previously "
-                "provided source."
+                "The answer requires information provided before the current request, such as "
+                "previous conversation, previous tool results, previously processed files, "
+                "memory, or earlier outputs."
             ),
             "context_no": (
-                "The request can be fulfilled without additional context. For unclear, "
+                "The request can be fulfilled using only the current request and its direct "
+                "inputs. This includes files, attachments, and their metadata provided with the "
+                "current request. Current-request inputs are not context. For unclear, "
                 "meaningless, random, or self-contained input, choose context_no."
             ),
         },
