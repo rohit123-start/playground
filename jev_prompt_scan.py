@@ -43,9 +43,14 @@ questions = {
         "criteria": {
             "context_yes": (
                 "The request requires information from uploaded files, previous conversation, "
-                "memory, provided data, or other external context."
+                "memory, provided data, or other external context. Choose context_yes only when "
+                "the user explicitly requires information from an external or previously "
+                "provided source."
             ),
-            "context_no": "The request can be fulfilled without additional context.",
+            "context_no": (
+                "The request can be fulfilled without additional context. For unclear, "
+                "meaningless, random, or self-contained input, choose context_no."
+            ),
         },
     },
 }
