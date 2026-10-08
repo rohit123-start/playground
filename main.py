@@ -1,3 +1,5 @@
+import inspect
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -11,15 +13,27 @@ import qwen_intent_embed
 import voyage_intent_embed
 
 BASE_DIR = Path(__file__).parent
+logger = logging.getLogger("uvicorn.error")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Eager loading: load the embedding model and embed the example prompts at startup.
-    bge_small_intent_embed.load()
-    await voyage_intent_embed.load()
-    await qwen_intent_embed.load()
-    await qwen8b_intent_embed.load()
+    # A failing loader (e.g. missing OPEN_ROUTER_API_KEY) must not take the whole app down;
+    # its endpoint returns 503 until the embeddings are loaded.
+    for name, loader in [
+        ("bge-small", bge_small_intent_embed.load),
+        ("voyage", voyage_intent_embed.load),
+        ("qwen", qwen_intent_embed.load),
+        ("qwen8b", qwen8b_intent_embed.load),
+    ]:
+        try:
+            result = loader()
+            if inspect.isawaitable(result):
+                await result
+        except Exception as e:
+            detail = getattr(e, "detail", None) or repr(e)
+            logger.error("Failed to load %s intent embeddings: %s", name, detail)
     yield
 
 
