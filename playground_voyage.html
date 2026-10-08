@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Intent Playground</title>
+<title>Voyage Intent Playground</title>
 <style>
   :root {
     --bg: #f7f7f5; --card: #ffffff; --text: #1c1c1a; --muted: #6b6b66; --line: #e2e2dd;
@@ -67,13 +67,13 @@
 <main>
   <nav class="nav">
     <a href="/playground">Tool selection</a>
-    <a href="/playground/intent" aria-current="page">Intent (bge-small)</a>
-    <a href="/playground/voyage">Intent (voyage)</a>
+    <a href="/playground/intent">Intent (bge-small)</a>
+    <a href="/playground/voyage" aria-current="page">Intent (voyage)</a>
     <a href="/playground/qwen">Intent (qwen 4b)</a>
     <a href="/playground/qwen8b">Intent (qwen 8b)</a>
   </nav>
-  <h1>Intent Playground</h1>
-  <p class="sub">Sends a prompt to <code>POST /bge-small-intent-embed</code> and shows the detected intent.</p>
+  <h1>Voyage Intent Playground</h1>
+  <p class="sub">Sends a prompt to <code>POST /voyage-intent-embed</code> (voyageai/voyage-4-lite via OpenRouter) and shows the detected intent.</p>
 
   <div class="card">
     <label for="q">Prompt</label>
@@ -107,7 +107,9 @@
 </main>
 
 <script>
-  const ROUTE = "/bge-small-intent-embed";
+  // Relative URLs only parse when served over http(s); fall back to the local server if opened as a file.
+  const BASE = location.protocol.startsWith("http") ? "" : "http://localhost:8000";
+  const ROUTE = BASE + "/voyage-intent-embed";
   const isValid = (b) => typeof b.intent === "string";
   // Renders the response; returns the label for the history table.
   function show(out, body) {
@@ -181,7 +183,7 @@
   q.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") run(); });
 
   // Example prompts come from prompt_intent_examples.json (served at /playground/examples).
-  fetch("/playground/examples").then(r => r.ok ? r.json() : null).then((data) => {
+  fetch(BASE + "/playground/examples").then(r => r.ok ? r.json() : null).then((data) => {
     if (!data || !data.intents) return;
     const intents = Object.keys(data.intents);
     $("examples-card").hidden = false;
