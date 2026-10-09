@@ -1,45 +1,66 @@
 {
-  "task": {
+  "answer_model": {
     "type": "choice",
-    "instructions": "Which single task category best matches what the user is asking for?",
+    "instructions": "Which model should write the reply to this request, if any?",
     "criteria": {
-      "general": "Request involves: question, explain, brainstorm, summarize, overview, advice.",
-      "coding": "Request involves: code, bug, debug, refactor, function, error, stack trace.",
-      "frontend": "Request involves: ui, landing page, website, component, react, html css, tailwind, dashboard ui, responsive layout.",
-      "agentic": "Request involves: multi-step task, use tools, browse, automate, workflow, call api, run commands, do it for me.",
-      "systems": "Request involves: architecture, system design, distributed system, concurrency, race condition, deadlock, scalability.",
-      "analysis": "Request involves: analyze, evaluate, trade-offs, multi-step, reasoning, plan.",
-      "writing": "Request involves: essay, email, rewrite, edit text, blog post.",
-      "research": "Request involves: latest, news, sources, compare prices. Needs fresh or web-sourced information with sources.",
-      "multimodal": "Request involves: image, photo, video, audio, screenshot. Understanding or analyzing an existing image, photo, video, audio or screenshot the user provides.",
-      "long_docs": "Request involves: long document, transcript, contract, uploaded file, paper. Working over a long or uploaded document, transcript, contract or paper.",
-      "chinese": "Request involves: chinese, 中文, translate to chinese, bilingual.",
-      "image_generation": "Request involves: generate image, create image, draw, illustration, logo, poster. Creating a brand-new image from a description.",
-      "image_editing": "Request involves: edit image, edit photo, remove background, replace object, change the style of this image, retouch, inpaint, extend image. Modifying an existing image.",
-      "video_generation": "Request involves: generate video, create video, animate, clip, motion. Creating a brand-new video from a description or image.",
-      "video_editing": "Request involves: edit video, edit this clip, change the video, restyle video, remove from video, replace in video. Modifying an existing video clip.",
-      "audio_generation": "Request involves: text to speech, voiceover, narrate, music, song. Creating speech, narration, music or songs.",
-      "audio_editing": "Request involves: edit song, change part of a song, replace a section, edit this track. Modifying an existing song or audio track."
+      "claude-opus-5-5": "Most requests: questions, explanations, advice, in-depth analysis, research-style knowledge work, long-form writing, coding, and system design; also creative writing such as stories, screenplays, dialogue, roleplay, and characters.",
+      "gpt-6-astra": "Long agent runs that use many tools or operate a terminal or computer, large code migrations, high-stakes work where a factual mistake would be costly, and math: proofs, equations, derivations, or competition-level problems.",
+      "gpt-5.5-pro": "A single very hard problem that needs long, careful thought: difficult logic, tricky quantitative analysis, or a question where accuracy matters far more than speed.",
+      "gpt-5.5": "Moderate tasks that should come back quickly and polished: customer-facing replies, business documents and deliverables, everyday coding, and classifying, extracting, tagging, or labeling information from text.",
+      "kimi-k3": "The request is in Chinese or is bilingual Chinese/English, or it is long-horizon coding across a large repository, or it involves a very long document.",
+      "none": "The request only asks to generate or edit an image, video, or audio, and that output is the whole reply."
     }
   },
-  "model": {
+  "search_model": {
     "type": "choice",
-    "instructions": "Which model is the best fit for this request, considering the task, how difficult it is, and whether it needs reasoning?",
+    "instructions": "Which model should search the web for this request, if any?",
     "criteria": {
-      "gpt-6-astra": "Handles: general, coding, frontend, agentic, systems, analysis, writing, multimodal, long_docs. Difficulty: complex. Thinking: always-on, deep thinking: true. Best for: long tool-heavy agent runs; high-stakes complex work; large migrations.",
-      "gpt-5.5-pro": "Handles: general, coding, frontend, agentic, systems, analysis, writing, multimodal, long_docs. Difficulty: complex. Thinking: always-on, deep thinking: true. Best for: hardest reasoning problems; accuracy over speed.",
-      "gpt-5.5": "Handles: general, coding, frontend, agentic, analysis, writing, multimodal, long_docs. Difficulty: moderate. Thinking: true, deep thinking: true. Best for: coding; tool-heavy agents; long-context retrieval; polished customer-facing answers.",
-      "claude-opus-5-5": "Handles: general, coding, frontend, agentic, systems, analysis, writing, multimodal, long_docs. Difficulty: complex. Thinking: adaptive, deep thinking: true. Best for: long-running agentic coding; knowledge work.",
-      "kimi-k3": "Handles: general, coding, frontend, agentic, systems, writing, multimodal, long_docs, chinese. Difficulty: complex. Thinking: true, deep thinking: true. Best for: coding; knowledge work; long documents and repos.",
-      "perplexity-sonar-pro": "Handles: research. Difficulty: moderate. Thinking: true, deep thinking: true. Best for: complex multi-source queries.",
-      "perplexity-sonar-pro-search": "Handles: research. Difficulty: moderate. Thinking: true, deep thinking: false. Best for: multi-step search with tools.",
-      "perplexity-sonar-deep-research": "Handles: research, analysis. Difficulty: complex. Thinking: always-on, deep thinking: true. Best for: exhaustive research reports.",
-      "gemini-3-pro-image": "Handles: image_generation, image_editing. Difficulty: complex. Thinking: true, deep thinking: false. Best for: legible text in images; heavy reference handling; production assets.",
-      "veo-3.1-generate-preview": "Handles: video_generation. Difficulty: complex. Thinking: false, deep thinking: false. Best for: premium cinematic clips; synced dialogue audio; final deliverables.",
-      "runway-aleph-2": "Handles: video_editing. Difficulty: complex. Thinking: false, deep thinking: false. Best for: edits on clips up to 30s at 1080p; multi-shot consistent edits; product swaps, relighting, restyles.",
-      "elevenlabs-music-v2": "Handles: audio_generation, audio_editing. Difficulty: complex. Thinking: false, deep thinking: false. Best for: full songs with vocals; genre switching; commercial use.",
-      "qwen-audio-3.0-tts-plus": "Handles: audio_generation. Difficulty: complex. Thinking: false, deep thinking: false. Best for: studio-quality narration; audiobooks and voice broadcasting; virtual avatars.",
-      "lyria-3-pro-preview": "Handles: audio_generation. Difficulty: complex. Thinking: false, deep thinking: false. Best for: high-quality full-length music; premium soundtracks; detailed musical control."
+      "none": "The request does not need current information from the web.",
+      "perplexity-sonar-pro": "Most web questions: a complex question answered by combining facts from several sources, with citations.",
+      "perplexity-sonar-pro-search": "A question that needs several searches in a row, where later searches depend on what earlier ones found.",
+      "perplexity-sonar-deep-research": "The user wants an exhaustive research report or a thorough investigation of a topic and is willing to wait for it."
+    }
+  },
+  "image_model": {
+    "type": "choice",
+    "instructions": "Which model should generate or edit the image in this request, if any?",
+    "criteria": {
+      "none": "The request does not ask to create or edit an image. Questions about images or pictures don't count.",
+      "gemini-3-pro-image": "Any image to generate or edit, including legible text, many reference images, and production-ready assets."
+    }
+  },
+  "video_generation_model": {
+    "type": "choice",
+    "instructions": "Which model should generate the video in this request, if any?",
+    "criteria": {
+      "none": "The request does not ask to create a new video. Questions about videos don't count.",
+      "veo-3.1-generate-preview": "Any video to generate, including cinematic clips with synchronized dialogue."
+    }
+  },
+  "video_editing_model": {
+    "type": "choice",
+    "instructions": "Which model should edit the video in this request, if any?",
+    "criteria": {
+      "none": "The request does not ask to change an existing video.",
+      "runway-aleph-2": "Any video edit: restyling, relighting, swapping a product, or consistent edits across shots, on clips up to 30 seconds."
+    }
+  },
+  "audio_generation_model": {
+    "type": "choice",
+    "instructions": "Which model should generate the audio in this request, if any?",
+    "criteria": {
+      "none": "The request does not ask to create audio such as speech, a song, or music. Questions about music or audio don't count.",
+      "qwen-audio-3.0-tts-plus": "Spoken voice: text to speech, narration, voiceover, audiobooks, broadcast-style reading, Chinese dialects, or speech with delivery cues such as whispering or laughing.",
+      "lyria-3-pro-preview": "Music: songs with sung vocals or instrumental tracks, soundtracks, and pieces where the user specifies detailed musical control.",
+      "elevenlabs-music-v2": "Music that must be cleared for commercial use, or a song that switches genre partway through."
+    }
+  },
+  "audio_editing_model": {
+    "type": "choice",
+    "instructions": "Which model should edit the audio in this request, if any?",
+    "criteria": {
+      "none": "The request does not ask to change an existing audio file.",
+      "elevenlabs-music-v2": "Any edit to an existing song or track, such as changing or replacing a section."
     }
   }
 }

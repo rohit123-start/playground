@@ -1,13 +1,12 @@
-"""POST /jev-model-picker-{low,medium,high}: pick a model for a prompt with typesafe/jev through the
-OpenRouter Decisions API. One call asks two choice questions (task, model); the final model is the
-highest-probability model among those in the tier that handle the chosen task."""
+"""POST /jev-model-picker-{low,medium,high}: pick models for a prompt with typesafe/jev through the
+OpenRouter Decisions API. One call asks one choice question per capability (answer, search, image,
+video generation/editing, audio generation/editing); each answer is a model of the tier or "none"."""
 import json
 import os
 import time
 from pathlib import Path
 
 import httpx
-import yaml
 from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -27,28 +26,19 @@ OPENROUTER_MODEL = os.getenv("JEV_OPEN_ROUTER_AI_MODEL")  # OpenRouter model id
 BASE_DIR = Path(__file__).parent
 TIERS = ("low", "medium", "high")
 
-# Questions come from questions_jev_model_picker_<tier>.json (built by build_model_picker_questions.py);
-# the model -> handled-tasks map comes from the same tier YAML.
-questions: dict[str, dict] = {}
-handles: dict[str, dict[str, set[str]]] = {}
-for _tier in TIERS:
-    questions[_tier] = json.loads(
-        (BASE_DIR / f"questions_jev_model_picker_{_tier}.json").read_text(encoding="utf-8")
+# Built from model_tiers/<tier>.yaml by build_model_picker_questions.py.
+questions: dict[str, dict] = {
+    tier: json.loads(
+        (BASE_DIR / f"questions_jev_model_picker_{tier}.json").read_text(encoding="utf-8")
     )
-    _data = yaml.safe_load((BASE_DIR / "model_tiers" / f"{_tier}.yaml").read_text(encoding="utf-8"))
-    handles[_tier] = {name: set(m["handles"]) for name, m in _data["models"].items()}
-
-
-class Candidate(BaseModel):
-    model: str
-    probability: float
+    for tier in TIERS
+}
 
 
 class ModelPickResponse(BaseModel):
     tier: str
-    model: str
-    task: Decision
-    candidates: list[Candidate]  # models in the tier that handle the task, best first
+    selected: dict[str, str | None]  # capability -> chosen model, or None when "none" won
+    decisions: dict[str, Decision]  # capability -> full decision with probabilities
     latency_ms: int
 
 
@@ -78,27 +68,11 @@ def _make_handler(tier: str):
         answers = r.json().get("answers")
         if not isinstance(answers, dict):
             raise HTTPException(status_code=502, detail=f"Unrecognised OpenRouter response: {r.text}")
-        task = _decision("task", answers.get("task"))
-        model_probs = _decision("model", answers.get("model")).probabilities
-
-        candidates = sorted(
-            (
-                Candidate(model=m, probability=p)
-                for m, p in model_probs.items()
-                if task.choice in handles[tier].get(m, ())
-            ),
-            key=lambda c: c.probability,
-            reverse=True,
-        )
-        if not candidates:
-            raise HTTPException(
-                status_code=502, detail=f"No {tier} model handles task {task.choice!r}"
-            )
+        decisions = {name: _decision(name, answers.get(name)) for name in questions[tier]}
         return ModelPickResponse(
             tier=tier,
-            model=candidates[0].model,
-            task=task,
-            candidates=candidates,
+            selected={n: (None if d.choice == "none" else d.choice) for n, d in decisions.items()},
+            decisions=decisions,
             latency_ms=round((time.perf_counter() - start) * 1000),
         )
 

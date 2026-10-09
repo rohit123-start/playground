@@ -1,469 +1,131 @@
-# MEDIUM tier only
-tasks:
-  general:
-    - question
-    - explain
-    - brainstorm
-    - summarize
-    - overview
-    - advice
-  coding:
-    - code
-    - bug
-    - debug
-    - refactor
-    - function
-    - error
-    - stack trace
-  frontend:
-    - ui
-    - landing page
-    - website
-    - component
-    - react
-    - html css
-    - tailwind
-    - dashboard ui
-    - responsive layout
-  agentic:
-    - multi-step task
-    - use tools
-    - browse
-    - automate
-    - workflow
-    - call api
-    - run commands
-    - do it for me
-  systems:
-    - architecture
-    - system design
-    - distributed system
-    - concurrency
-    - race condition
-    - deadlock
-    - scalability
-  analysis:
-    - analyze
-    - evaluate
-    - trade-offs
-    - multi-step
-    - reasoning
-    - plan
-  writing:
-    - essay
-    - email
-    - rewrite
-    - edit text
-    - blog post
-  creative:
-    - story
-    - screenplay
-    - dialogue
-    - roleplay
-    - character
-  research:
-    - latest
-    - news
-    - sources
-    - compare prices
-  math:
-    - proof
-    - equation
-    - olympiad
-    - derive
-  multimodal:
-    - image
-    - photo
-    - video
-    - audio
-    - screenshot
-  long_docs:
-    - long document
-    - transcript
-    - contract
-    - uploaded file
-    - paper
-  chinese:
-    - chinese
-    - 中文
-    - translate to chinese
-    - bilingual
-  extraction:
-    - classify
-    - extract
-    - tag
-    - label
-    - high volume
-  image_generation:
-    - generate image
-    - create image
-    - draw
-    - illustration
-    - logo
-    - poster
-  image_editing:
-    - edit image
-    - edit photo
-    - remove background
-    - replace object
-    - change the style of this image
-    - retouch
-    - inpaint
-    - extend image
-  video_generation:
-    - generate video
-    - create video
-    - animate
-    - clip
-    - motion
-  video_editing:
-    - edit video
-    - edit this clip
-    - change the video
-    - restyle video
-    - remove from video
-    - replace in video
-  audio_generation:
-    - text to speech
-    - voiceover
-    - narrate
-    - music
-    - song
-  audio_editing:
-    - edit song
-    - change part of a song
-    - replace a section
-    - edit this track
+choices:
 
-models:
-  # ---------- General (7) ----------
-  gpt-6.1-sol:
-    tier: medium
-    features:
-      thinking: always-on
-      deep_thinking: true
-    handles:
-      - general
-      - coding
-      - frontend
-      - agentic
-      - analysis
-      - writing
-      - multimodal
-      - long_docs
-    difficulty: complex
-    best_for:
-      - everyday coding
-      - agentic workflows
-      - computer use
+  answer_model:
+    type: choice
+    instructions: Which model should write the reply to this request, if any?
+    criteria:
+      claude-sonnet-5-5: >-
+        Most requests: questions, explanations, advice, writing and rewriting,
+        everyday coding, command-line work, and professional deliverables; also
+        creative writing such as stories, screenplays, dialogue, roleplay, and
+        characters.
+      gpt-6.1-sol: >-
+        Agent work that automates a workflow across several tools or steps,
+        operating a computer, or technical and scientific tasks.
+      grok-4.7: >-
+        Legal analysis, quick one-shot scripts, and system design questions such as
+        concurrency, scalability, or distributed systems.
+      qwen3.8-max-0902: >-
+        The request is in Chinese or bilingual, or it has many strict formatting or
+        instruction constraints, or it involves reading papers, or quick UI
+        prototyping.
+      glm-5.3: >-
+        Cybersecurity work such as finding or analysing vulnerabilities, changes
+        across many files in a repository, or long-horizon coding agents.
+      gpt-5.6-terra: >-
+        Analysis of long documents, contracts, transcripts, or knowledge bases,
+        business process automation, and classifying, extracting, tagging, or
+        labeling information from text or documents.
+      gpt-5.3-codex: >-
+        A pure coding task for an agent to carry out in a terminal: write, fix,
+        refactor, test, or debug code, with no general conversation needed.
+      gemini-3.1-pro-preview: >-
+        Math: proofs, equations, derivations, or calculations; also abstract
+        reasoning and logic puzzles.
+      none: >-
+        The request only asks to generate or edit an image, video, or audio, and
+        that output is the whole reply.
 
-  gpt-5.6-terra:
-    tier: medium
-    features:
-      thinking: true
-      deep_thinking: true
-    handles:
-      - general
-      - writing
-      - multimodal
-      - long_docs
-    difficulty: moderate
-    best_for:
-      - business process automation
-      - document and knowledge-base analysis
-      - 1M-token context
+  search_model:
+    type: choice
+    instructions: Which model should search the web for this request, if any?
+    criteria:
+      none: >-
+        The request does not need current information from the web.
+      perplexity-sonar-reasoning-pro: >-
+        Any web question, including ones that need reasoning and an analytical
+        answer with citations.
 
-  claude-sonnet-5-5:
-    tier: medium
-    features:
-      thinking: adaptive
-      deep_thinking: true
-    handles:
-      - general
-      - coding
-      - frontend
-      - agentic
-      - writing
-      - multimodal
-      - long_docs
-    difficulty: moderate
-    best_for:
-      - best speed-intelligence balance
-      - everyday coding and writing
+  image_model:
+    type: choice
+    instructions: Which model should generate or edit the image in this request, if any?
+    criteria:
+      none: >-
+        The request does not ask to create or edit an image. Questions about images
+        or pictures don't count.
+      gemini-3.1-flash-image: >-
+        Most images and edits; also images with text in a language other than
+        English, very high resolution (up to 4K), or real-world subjects that need
+        up-to-date reference.
+      qwen-image-3.0-pro: >-
+        Dense layouts such as infographics, multi-panel grids, exam sheets, or
+        posters with very small readable text or formulas, and restoring damaged
+        images.
+      gpt-image-2.5-sunburst: >-
+        Precise targeted edits, product imagery, or a series of revisions that must
+        keep the same subject consistent across several turns.
+      gpt-image-2.5-flare: >-
+        Fast concept drafts, social images, and quick visual exploration while the
+        user is still trying ideas.
 
-  gemini-3.1-pro-preview:
-    tier: medium
-    features:
-      thinking: always-on
-      deep_thinking: false
-    handles:
-      - general
-      - coding
-      - frontend
-      - analysis
-      - multimodal
-      - long_docs
-    difficulty: complex
-    best_for:
-      - software engineering
-      - precise multi-step tool use
+  video_generation_model:
+    type: choice
+    instructions: Which model should generate the video in this request, if any?
+    criteria:
+      none: >-
+        The request does not ask to create a new video. Questions about videos don't
+        count.
+      wan3.0-video: >-
+        Most video requests; also clips longer than 15 seconds (up to 30),
+        characters who must stay consistent, or characters speaking in several
+        languages.
+      seedance-2.0: >-
+        A scene built from several reference images, videos, or audio clips, or
+        characters speaking with lip-synced dialogue.
+      kling-v3.0-pro: >-
+        4K output, or a multi-shot storyboard with cinematic 1080p or higher scenes.
+      runway-gen-4.5: >-
+        Realistic physics and motion such as flowing water or heavy objects, or
+        expressive, stylized characters.
+      kling-v3.0-motion-control: >-
+        An exact camera path, or movement copied from a reference video or precisely
+        choreographed.
+      kling-v3.0-turbo: >-
+        Fast, dialogue-ready clips with sound included, or many clips at once.
+      seedance-2-fast: >-
+        A quick, low-cost 720p draft where speed matters more than quality.
 
-  grok-4.7:
-    tier: medium
-    features:
-      thinking: always-on
-      deep_thinking: true
-    handles:
-      - general
-      - coding
-      - agentic
-      - systems
-      - writing
-      - multimodal
-    difficulty: complex
-    best_for:
-      - coding
-      - agentic tasks
-      - long projects
-      - 500K context
+  video_editing_model:
+    type: choice
+    instructions: Which model should edit the video in this request, if any?
+    criteria:
+      none: >-
+        The request does not ask to change an existing video.
+      seedance-2.0: >-
+        Most video edits, especially high-quality output, dialogue, or edits guided
+        by several reference images.
+      seedance-2-fast: >-
+        A quick, simple 720p edit where speed matters more than quality.
 
-  qwen3.8-max-0902:
-    tier: medium
-    features:
-      thinking: true
-      deep_thinking: true
-    handles:
-      - general
-      - coding
-      - frontend
-      - agentic
-      - systems
-      - writing
-      - multimodal
-      - long_docs
-      - chinese
-    difficulty: complex
-    best_for:
-      - multi-day autonomous projects
-      - complex coding workflows
-      - UI prototyping
+  audio_generation_model:
+    type: choice
+    instructions: Which model should generate the audio in this request, if any?
+    criteria:
+      none: >-
+        The request does not ask to create audio such as speech, a song, or music.
+        Questions about music or audio don't count.
+      elevenlabs-v2.5-turbo: >-
+        Spoken voice: text to speech, voiceover, narration, or conversational voice.
+      lyria-3.5: >-
+        Music: songs with vocals, instrumentals, soundtracks, or background music
+        from 30 seconds to 3 minutes.
 
-  glm-5.3:
-    tier: medium
-    features:
-      thinking: always-on
-      deep_thinking: true
-    handles:
-      - general
-      - coding
-      - frontend
-      - agentic
-      - systems
-      - long_docs
-      - chinese
-    difficulty: moderate
-    best_for:
-      - multi-file repo changes
-      - long-horizon coding agents
-      - defensive security
-
-  # ---------- Code-only (1) ----------
-  gpt-5.3-codex:
-    tier: medium
-    features:
-      thinking: true
-      deep_thinking: true
-    handles:
-      - coding
-      - frontend
-      - agentic
-      - analysis
-      - multimodal
-    difficulty: moderate
-    best_for:
-      - agentic coding
-
-  # ---------- Search / Research (1) ----------
-  perplexity-sonar-reasoning-pro:
-    tier: medium
-    features:
-      thinking: true
-      deep_thinking: true
-    handles:
-      - research
-      - analysis
-    difficulty: moderate
-    best_for:
-      - research needing reasoning
-      - analytical answers with citations
-
-  # ---------- Image (4) ----------
-  gpt-image-2.5-sunburst:
-    tier: medium
-    features:
-      thinking: false
-      deep_thinking: false
-    handles:
-      - image_generation
-      - image_editing
-    difficulty: complex
-    best_for:
-      - premium multi-turn editing
-      - complex layouts
-      - reference fidelity
-
-  gpt-image-2.5-flare:
-    tier: medium
-    features:
-      thinking: false
-      deep_thinking: false
-    handles:
-      - image_generation
-      - image_editing
-    difficulty: moderate
-    best_for:
-      - fast everyday image generation
-      - high-volume images
-
-  gemini-3.1-flash-image:
-    tier: medium
-    features:
-      thinking: true
-      deep_thinking: false
-    handles:
-      - image_generation
-      - image_editing
-    difficulty: complex
-    best_for:
-      - fast high-quality images
-      - multilingual text in images
-      - up to 4K
-
-  qwen-image-3.0-pro:
-    tier: medium
-    features:
-      thinking: false
-      deep_thinking: false
-    handles:
-      - image_generation
-      - image_editing
-    difficulty: complex
-    best_for:
-      - reference-based editing
-      - high-resolution output
-      - infographics and dense layouts
-
-  # ---------- Video (7) ----------
-  wan3.0-video:
-    tier: medium
-    features:
-      thinking: false
-      deep_thinking: false
-    handles:
-      - video_generation
-    difficulty: complex
-    best_for:
-      - long clips up to 30s
-      - reference-consistent characters
-
-  seedance-2.0:
-    tier: medium
-    features:
-      thinking: false
-      deep_thinking: false
-    handles:
-      - video_generation
-      - video_editing
-    difficulty: complex
-    best_for:
-      - up to 4K video
-      - lip-synced dialogue
-      - multi-reference scenes
-
-  seedance-2-fast:
-    tier: medium
-    features:
-      thinking: false
-      deep_thinking: false
-    handles:
-      - video_generation
-      - video_editing
-    difficulty: moderate
-    best_for:
-      - fast 720p production clips
-
-  kling-v3.0-pro:
-    tier: medium
-    features:
-      thinking: false
-      deep_thinking: false
-    handles:
-      - video_generation
-    difficulty: complex
-    best_for:
-      - multi-shot storyboards
-      - cinematic 1080p scenes
-
-  kling-v3.0-turbo:
-    tier: medium
-    features:
-      thinking: false
-      deep_thinking: false
-    handles:
-      - video_generation
-    difficulty: moderate
-    best_for:
-      - fast Kling 3.0 generation
-      - multi-shot prompts up to 6 shots
-      - 720p and 1080p clips up to 15s
-
-  kling-v3.0-motion-control:
-    tier: medium
-    features:
-      thinking: false
-      deep_thinking: false
-    handles:
-      - video_generation
-    difficulty: complex
-    best_for:
-      - precise camera paths
-      - choreographed motion
-
-  runway-gen-4.5:
-    tier: medium
-    features:
-      thinking: false
-      deep_thinking: false
-    handles:
-      - video_generation
-    difficulty: complex
-    best_for:
-      - cinematic motion and lighting
-      - animating a still image
-
-  # ---------- Audio (2) ----------
-  elevenlabs-v2.5-turbo:
-    tier: medium
-    features:
-      thinking: false
-      deep_thinking: false
-    handles:
-      - audio_generation
-    difficulty: simple
-    best_for:
-      - low-latency conversational voice
-
-  lyria-3.5:
-    tier: medium
-    features:
-      thinking: false
-      deep_thinking: false
-    handles:
-      - audio_generation
-    difficulty: complex
-    best_for:
-      - music generation
-      - stable production music
-      - songs and soundtracks
-
-# Tasks with no model in this tier: creative, math, extraction, audio_editing
+  audio_editing_model:
+    type: choice
+    instructions: Which model should edit the audio in this request, if any?
+    criteria:
+      none: >-
+        The request does not ask to change an existing audio file.
+      lyria-3.5: >-
+        Edits to an existing music track, such as changing, replacing, or extending
+        a section.

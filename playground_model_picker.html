@@ -48,6 +48,10 @@
   .tool code { font-weight: 600; min-width: 0; overflow-wrap: anywhere; flex: 0 1 230px; }
   .bar { flex: 1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
   .bar > i { display: block; height: 100%; background: var(--good); }
+  .cap { border-top: 1px solid var(--line); padding: 8px 0; }
+  .cap summary { cursor: pointer; padding: 2px 0; }
+  .cap code.none { color: var(--muted); font-style: italic; font-weight: 400; }
+  .cap[open] { padding-bottom: 4px; }
   .intent { font-size: 26px; font-weight: 700; margin: 0 0 4px; overflow-wrap: anywhere; }
   .example { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
   .err { color: var(--bad); white-space: pre-wrap; word-break: break-word; }
@@ -76,7 +80,7 @@
     <a href="/playground/model-picker" aria-current="page">Model picker (JEV)</a>
   </nav>
   <h1>Model Picker Playground</h1>
-  <p class="sub">Sends a prompt to <code id="route-label"></code> (typesafe/jev via OpenRouter). JEV picks the task, then the best model in the chosen tier that handles it.</p>
+  <p class="sub">Sends a prompt to <code id="route-label"></code> (typesafe/jev via OpenRouter). For each capability (answer, search, image, video, audio) JEV picks a model from the chosen tier, or none.</p>
 
   <div class="card">
     <label id="tier-label">Sub category</label>
@@ -99,7 +103,7 @@
   <div class="card" id="history-card" hidden>
     <label>History</label>
     <table>
-      <thead><tr><th>Prompt</th><th>Tier</th><th>Task</th><th>Model</th><th>Latency</th></tr></thead>
+      <thead><tr><th>Prompt</th><th>Tier</th><th>Selected</th><th>Latency</th></tr></thead>
       <tbody id="history"></tbody>
     </table>
   </div>
@@ -119,11 +123,11 @@
     "Explain how a hash map works", "Fix this stack trace from my Node server",
     "Build a responsive landing page with Tailwind", "Prove that the square root of 2 is irrational",
     "Draft a polite email asking for a deadline extension", "What is the latest news on the EU AI Act?",
-    "Generate a logo for my coffee shop", "Remove the background from this photo",
+    "Generate a logo for my coffee shop", "Write a tagline for it and generate a matching poster",
     "Create a 10 second cinematic video of a city at night", "Narrate this chapter as an audiobook",
     "Design a distributed rate limiter that scales", "Extract all invoice numbers from these 5,000 emails",
   ];
-  const isValid = (b) => typeof b.model === "string" && b.task && Array.isArray(b.candidates);
+  const isValid = (b) => b.selected && b.decisions;
   const $ = (id) => document.getElementById(id);
   const q = $("q"), send = $("send");
   let tier = "low";
@@ -145,18 +149,29 @@
     return d ? (typeof d === "string" ? d : JSON.stringify(d)) : (errText || "Request failed");
   }
 
-  // Renders the response; returns [task, model] for the history table.
+  const LABELS = {
+    answer_model: "Answer", search_model: "Web search", image_model: "Image",
+    video_generation_model: "Video generation", video_editing_model: "Video editing",
+    audio_generation_model: "Audio generation", audio_editing_model: "Audio editing",
+  };
+
+  // One block per capability: the chosen model (or "none") with all option probabilities.
+  // Returns a short summary of the non-none picks for the history table.
   function show(out, body) {
-    out.append(el("h2", {}, "Selected model"),
-               el("div", { className: "intent" }, body.model),
-               el("div", { className: "example" }, "task: " + body.task.choice +
-                 " (confidence " + (body.task.confidence ?? "n/a") + ")"));
-    out.append(el("h2", {}, "Candidates for this task"));
-    for (const c of body.candidates) out.append(scoreBar(c.model, c.probability));
-    out.append(el("h2", {}, "Task probabilities"));
-    const tasks = Object.entries(body.task.probabilities).sort((a, b) => b[1] - a[1]).slice(0, 5);
-    for (const [name, p] of tasks) out.append(scoreBar(name, p));
-    return [body.task.choice, body.model];
+    const picks = [];
+    for (const [cap, d] of Object.entries(body.decisions)) {
+      const model = body.selected[cap];
+      if (model) picks.push((LABELS[cap] || cap) + ": " + model);
+      const block = el("details", { className: "cap" });
+      block.append(el("summary", {},
+        el("b", {}, LABELS[cap] || cap), " → ",
+        el("code", { className: model ? "" : "none" }, model || "none"),
+        el("span", { className: "hint" }, "  " + Math.max(...Object.values(d.probabilities)).toFixed(2))));
+      const sorted = Object.entries(d.probabilities).sort((a, b) => b[1] - a[1]);
+      for (const [name, p] of sorted) block.append(scoreBar(name, p));
+      out.append(block);
+    }
+    return picks.length ? picks.join("; ") : "none";
   }
 
   function setTier(t) {
@@ -197,14 +212,14 @@
     let label;
     if (!ok) {
       out.append(el("div", { className: "err" }, errorText(body, errText)));
-      label = ["error", ""];
+      label = "error";
     } else {
       label = show(out, body);
     }
     $("raw").textContent = body ? JSON.stringify(body, null, 2) : (errText || "");
     $("history-card").hidden = false;
-    $("history").prepend(el("tr", {}, el("td", {}, text), el("td", {}, useTier), el("td", {}, label[0]),
-                                      el("td", {}, label[1]), el("td", { className: "num" }, ms + " ms")));
+    $("history").prepend(el("tr", {}, el("td", {}, text), el("td", {}, useTier),
+                                      el("td", {}, label), el("td", { className: "num" }, ms + " ms")));
     send.disabled = false; send.textContent = "Send";
   }
 

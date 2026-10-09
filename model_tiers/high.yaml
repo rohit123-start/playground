@@ -1,361 +1,105 @@
-# HIGH tier only
-tasks:
-  general:
-    - question
-    - explain
-    - brainstorm
-    - summarize
-    - overview
-    - advice
-  coding:
-    - code
-    - bug
-    - debug
-    - refactor
-    - function
-    - error
-    - stack trace
-  frontend:
-    - ui
-    - landing page
-    - website
-    - component
-    - react
-    - html css
-    - tailwind
-    - dashboard ui
-    - responsive layout
-  agentic:
-    - multi-step task
-    - use tools
-    - browse
-    - automate
-    - workflow
-    - call api
-    - run commands
-    - do it for me
-  systems:
-    - architecture
-    - system design
-    - distributed system
-    - concurrency
-    - race condition
-    - deadlock
-    - scalability
-  analysis:
-    - analyze
-    - evaluate
-    - trade-offs
-    - multi-step
-    - reasoning
-    - plan
-  writing:
-    - essay
-    - email
-    - rewrite
-    - edit text
-    - blog post
-  creative:
-    - story
-    - screenplay
-    - dialogue
-    - roleplay
-    - character
-  research:
-    - latest
-    - news
-    - sources
-    - compare prices
-  math:
-    - proof
-    - equation
-    - olympiad
-    - derive
-  multimodal:
-    - image
-    - photo
-    - video
-    - audio
-    - screenshot
-  long_docs:
-    - long document
-    - transcript
-    - contract
-    - uploaded file
-    - paper
-  chinese:
-    - chinese
-    - 中文
-    - translate to chinese
-    - bilingual
-  extraction:
-    - classify
-    - extract
-    - tag
-    - label
-    - high volume
-  image_generation:
-    - generate image
-    - create image
-    - draw
-    - illustration
-    - logo
-    - poster
-  image_editing:
-    - edit image
-    - edit photo
-    - remove background
-    - replace object
-    - change the style of this image
-    - retouch
-    - inpaint
-    - extend image
-  video_generation:
-    - generate video
-    - create video
-    - animate
-    - clip
-    - motion
-  video_editing:
-    - edit video
-    - edit this clip
-    - change the video
-    - restyle video
-    - remove from video
-    - replace in video
-  audio_generation:
-    - text to speech
-    - voiceover
-    - narrate
-    - music
-    - song
-  audio_editing:
-    - edit song
-    - change part of a song
-    - replace a section
-    - edit this track
+choices:
 
-models:
-  # ---------- General (5) ----------
-  gpt-6-astra:
-    tier: high
-    features:
-      thinking: always-on
-      deep_thinking: true
-    handles:
-      - general
-      - coding
-      - frontend
-      - agentic
-      - systems
-      - analysis
-      - writing
-      - multimodal
-      - long_docs
-    difficulty: complex
-    best_for:
-      - long tool-heavy agent runs
-      - high-stakes complex work
-      - large migrations
+  answer_model:
+    type: choice
+    instructions: Which model should write the reply to this request, if any?
+    criteria:
+      claude-opus-5-5: >-
+        Most requests: questions, explanations, advice, in-depth analysis,
+        research-style knowledge work, long-form writing, coding, and system design;
+        also creative writing such as stories, screenplays, dialogue, roleplay, and
+        characters.
+      gpt-6-astra: >-
+        Long agent runs that use many tools or operate a terminal or computer, large
+        code migrations, high-stakes work where a factual mistake would be costly,
+        and math: proofs, equations, derivations, or competition-level problems.
+      gpt-5.5-pro: >-
+        A single very hard problem that needs long, careful thought: difficult
+        logic, tricky quantitative analysis, or a question where accuracy matters
+        far more than speed.
+      gpt-5.5: >-
+        Moderate tasks that should come back quickly and polished: customer-facing
+        replies, business documents and deliverables, everyday coding, and
+        classifying, extracting, tagging, or labeling information from text.
+      kimi-k3: >-
+        The request is in Chinese or is bilingual Chinese/English, or it is
+        long-horizon coding across a large repository, or it involves a very long
+        document.
+      none: >-
+        The request only asks to generate or edit an image, video, or audio, and
+        that output is the whole reply.
 
-  gpt-5.5-pro:
-    tier: high
-    features:
-      thinking: always-on
-      deep_thinking: true
-    handles:
-      - general
-      - coding
-      - frontend
-      - agentic
-      - systems
-      - analysis
-      - writing
-      - multimodal
-      - long_docs
-    difficulty: complex
-    best_for:
-      - hardest reasoning problems
-      - accuracy over speed
+  search_model:
+    type: choice
+    instructions: Which model should search the web for this request, if any?
+    criteria:
+      none: >-
+        The request does not need current information from the web.
+      perplexity-sonar-pro: >-
+        Most web questions: a complex question answered by combining facts from
+        several sources, with citations.
+      perplexity-sonar-pro-search: >-
+        A question that needs several searches in a row, where later searches depend
+        on what earlier ones found.
+      perplexity-sonar-deep-research: >-
+        The user wants an exhaustive research report or a thorough investigation of
+        a topic and is willing to wait for it.
 
-  gpt-5.5:
-    tier: high
-    features:
-      thinking: true
-      deep_thinking: true
-    handles:
-      - general
-      - coding
-      - frontend
-      - agentic
-      - analysis
-      - writing
-      - multimodal
-      - long_docs
-    difficulty: moderate
-    best_for:
-      - coding
-      - tool-heavy agents
-      - long-context retrieval
-      - polished customer-facing answers
+  image_model:
+    type: choice
+    instructions: Which model should generate or edit the image in this request, if any?
+    criteria:
+      none: >-
+        The request does not ask to create or edit an image. Questions about images
+        or pictures don't count.
+      gemini-3-pro-image: >-
+        Any image to generate or edit, including legible text, many reference
+        images, and production-ready assets.
 
-  claude-opus-5-5:
-    tier: high
-    features:
-      thinking: adaptive
-      deep_thinking: true
-    handles:
-      - general
-      - coding
-      - frontend
-      - agentic
-      - systems
-      - analysis
-      - writing
-      - multimodal
-      - long_docs
-    difficulty: complex
-    best_for:
-      - long-running agentic coding
-      - knowledge work
+  video_generation_model:
+    type: choice
+    instructions: Which model should generate the video in this request, if any?
+    criteria:
+      none: >-
+        The request does not ask to create a new video. Questions about videos don't
+        count.
+      veo-3.1-generate-preview: >-
+        Any video to generate, including cinematic clips with synchronized dialogue.
 
-  kimi-k3:
-    tier: high
-    features:
-      thinking: true
-      deep_thinking: true
-    handles:
-      - general
-      - coding
-      - frontend
-      - agentic
-      - systems
-      - writing
-      - multimodal
-      - long_docs
-      - chinese
-    difficulty: complex
-    best_for:
-      - coding
-      - knowledge work
-      - long documents and repos
+  video_editing_model:
+    type: choice
+    instructions: Which model should edit the video in this request, if any?
+    criteria:
+      none: >-
+        The request does not ask to change an existing video.
+      runway-aleph-2: >-
+        Any video edit: restyling, relighting, swapping a product, or consistent
+        edits across shots, on clips up to 30 seconds.
 
-  # ---------- Search / Research (3) ----------
-  perplexity-sonar-pro:
-    tier: high
-    features:
-      thinking: true
-      deep_thinking: true
-    handles:
-      - research
-    difficulty: moderate
-    best_for:
-      - complex multi-source queries
+  audio_generation_model:
+    type: choice
+    instructions: Which model should generate the audio in this request, if any?
+    criteria:
+      none: >-
+        The request does not ask to create audio such as speech, a song, or music.
+        Questions about music or audio don't count.
+      qwen-audio-3.0-tts-plus: >-
+        Spoken voice: text to speech, narration, voiceover, audiobooks,
+        broadcast-style reading, Chinese dialects, or speech with delivery cues such
+        as whispering or laughing.
+      lyria-3-pro-preview: >-
+        Music: songs with sung vocals or instrumental tracks, soundtracks, and
+        pieces where the user specifies detailed musical control.
+      elevenlabs-music-v2: >-
+        Music that must be cleared for commercial use, or a song that switches genre
+        partway through.
 
-  perplexity-sonar-pro-search:
-    tier: high
-    features:
-      thinking: true
-      deep_thinking: false
-    handles:
-      - research
-    difficulty: moderate
-    best_for:
-      - multi-step search with tools
-
-  perplexity-sonar-deep-research:
-    tier: high
-    features:
-      thinking: always-on
-      deep_thinking: true
-    handles:
-      - research
-      - analysis
-    difficulty: complex
-    best_for:
-      - exhaustive research reports
-
-  # ---------- Image (1) ----------
-  gemini-3-pro-image:
-    tier: high
-    features:
-      thinking: true
-      deep_thinking: false
-    handles:
-      - image_generation
-      - image_editing
-    difficulty: complex
-    best_for:
-      - legible text in images
-      - heavy reference handling
-      - production assets
-
-  # ---------- Video (2) ----------
-  veo-3.1-generate-preview:
-    tier: high
-    features:
-      thinking: false
-      deep_thinking: false
-    handles:
-      - video_generation
-    difficulty: complex
-    best_for:
-      - premium cinematic clips
-      - synced dialogue audio
-      - final deliverables
-
-  runway-aleph-2:
-    tier: high
-    features:
-      thinking: false
-      deep_thinking: false
-    handles:
-      - video_editing
-    difficulty: complex
-    best_for:
-      - edits on clips up to 30s at 1080p
-      - multi-shot consistent edits
-      - product swaps, relighting, restyles
-
-  # ---------- Audio (3) ----------
-  elevenlabs-music-v2:
-    tier: high
-    features:
-      thinking: false
-      deep_thinking: false
-    handles:
-      - audio_generation
-      - audio_editing
-    difficulty: complex
-    best_for:
-      - full songs with vocals
-      - genre switching
-      - commercial use
-
-  qwen-audio-3.0-tts-plus:
-    tier: high
-    features:
-      thinking: false
-      deep_thinking: false
-    handles:
-      - audio_generation
-    difficulty: complex
-    best_for:
-      - studio-quality narration
-      - audiobooks and voice broadcasting
-      - virtual avatars
-
-  lyria-3-pro-preview:
-    tier: high
-    features:
-      thinking: false
-      deep_thinking: false
-    handles:
-      - audio_generation
-    difficulty: complex
-    best_for:
-      - high-quality full-length music
-      - premium soundtracks
-      - detailed musical control
-
-# Tasks with no model in this tier: creative, math, extraction
+  audio_editing_model:
+    type: choice
+    instructions: Which model should edit the audio in this request, if any?
+    criteria:
+      none: >-
+        The request does not ask to change an existing audio file.
+      elevenlabs-music-v2: >-
+        Any edit to an existing song or track, such as changing or replacing a
+        section.

@@ -1,56 +1,79 @@
 {
-  "task": {
+  "answer_model": {
     "type": "choice",
-    "instructions": "Which single task category best matches what the user is asking for?",
+    "instructions": "Which model should write the reply to this request, if any?",
     "criteria": {
-      "general": "Request involves: question, explain, brainstorm, summarize, overview, advice.",
-      "coding": "Request involves: code, bug, debug, refactor, function, error, stack trace.",
-      "analysis": "Request involves: analyze, evaluate, trade-offs, multi-step, reasoning, plan.",
-      "writing": "Request involves: essay, email, rewrite, edit text, blog post.",
-      "research": "Request involves: latest, news, sources, compare prices. Needs fresh or web-sourced information with sources.",
-      "math": "Request involves: proof, equation, olympiad, derive.",
-      "multimodal": "Request involves: image, photo, video, audio, screenshot. Understanding or analyzing an existing image, photo, video, audio or screenshot the user provides.",
-      "long_docs": "Request involves: long document, transcript, contract, uploaded file, paper. Working over a long or uploaded document, transcript, contract or paper.",
-      "chinese": "Request involves: chinese, 中文, translate to chinese, bilingual.",
-      "extraction": "Request involves: classify, extract, tag, label, high volume. Classifying, extracting, tagging or labeling content, often in high volume.",
-      "image_generation": "Request involves: generate image, create image, draw, illustration, logo, poster. Creating a brand-new image from a description.",
-      "image_editing": "Request involves: edit image, edit photo, remove background, replace object, change the style of this image, retouch, inpaint, extend image. Modifying an existing image.",
-      "video_generation": "Request involves: generate video, create video, animate, clip, motion. Creating a brand-new video from a description or image.",
-      "video_editing": "Request involves: edit video, edit this clip, change the video, restyle video, remove from video, replace in video. Modifying an existing video clip.",
-      "audio_generation": "Request involves: text to speech, voiceover, narrate, music, song. Creating speech, narration, music or songs."
+      "glm-5.3-flash": "Most requests: general questions, explanations, and everyday coding; also reading text from screenshots or scanned documents, and multi-step tasks that use tools, browse a website, call an API, or work through a document step by step.",
+      "gemini-3.8-flash": "Analysis, including finance or legal analysis, multi-step science or engineering reasoning, system design and architecture questions such as scalability, concurrency, race conditions, or deadlocks, and questions about attached videos, audio, or PDFs.",
+      "deepseek-v4.1-flash": "Math: equations, proofs, derivations, or calculations; coding tasks; and finding information inside a very long text.",
+      "qwen3.8-flash": "Questions about what is in an attached image, such as identifying or locating objects; building web pages, landing pages, UI components, or dashboards, including from a design or screenshot.",
+      "gpt-6-luna": "Classifying, extracting, tagging, or labeling information from text or documents.",
+      "gpt-5.4-mini": "Writing tasks such as an email, a rewrite, or a short essay, and creative writing such as stories, dialogue, roleplay, or characters.",
+      "claude-haiku-4-5": "Very simple questions where the fastest possible reply matters most.",
+      "qwen3-coder-next": "A pure coding task with no explanation or conversation needed.",
+      "none": "The request only asks to generate or edit an image, video, or audio, and that output is the whole reply."
     }
   },
-  "model": {
+  "search_model": {
     "type": "choice",
-    "instructions": "Which model is the best fit for this request, considering the task, how difficult it is, and whether it needs reasoning?",
+    "instructions": "Which model should search the web for this request, if any?",
     "criteria": {
-      "gpt-6-luna": "Handles: general, extraction, multimodal, long_docs. Difficulty: simple. Thinking: true, deep thinking: true. Best for: high-volume focused tasks; classification and extraction; many parallel sub-agents.",
-      "gpt-6-luna-fast": "Handles: general, extraction, long_docs. Difficulty: simple. Thinking: true, deep thinking: true. Best for: lowest-latency Luna responses; real-time high-volume tasks; fast classification and extraction.",
-      "gpt-5.4-mini": "Handles: general, analysis, writing, multimodal. Difficulty: moderate. Thinking: true, deep thinking: false. Best for: cost-sensitive low-latency workloads.",
-      "claude-haiku-4-5": "Handles: general, coding, multimodal. Difficulty: simple. Thinking: true, deep thinking: false. Best for: fastest near-frontier answers; low-latency tasks.",
-      "gemini-3.8-flash": "Handles: general, coding, analysis, multimodal, long_docs. Difficulty: moderate. Thinking: always-on, deep thinking: false. Best for: end-to-end engineering tasks; multi-step STEM reasoning; finance and legal analysis.",
-      "qwen3.8-flash": "Handles: general, coding, multimodal, long_docs, chinese. Difficulty: simple. Thinking: true, deep thinking: true. Best for: multimodal agents; visual coding; visual perception.",
-      "glm-5.3-flash": "Handles: general, coding, multimodal, long_docs, chinese. Difficulty: simple. Thinking: always-on, deep thinking: true. Best for: visual coding; fast multimodal agents; browser and document workflows.",
-      "deepseek-v4.1-flash": "Handles: general, math, multimodal, long_docs, chinese. Difficulty: simple. Thinking: true, deep thinking: true. Best for: fast cheap coding; long-context retrieval; math reasoning.",
-      "deepseek-v4.1-flash-fast": "Handles: general, math, multimodal, long_docs, chinese. Difficulty: simple. Thinking: true, deep thinking: true. Best for: fastest v4.1-flash responses; low-latency math and long-context; real-time cheap answers.",
-      "deepseek-v4-pro-0813": "Handles: general, coding, math, long_docs, chinese. Difficulty: moderate. Thinking: true, deep thinking: true. Best for: complex agent workflows; deep reasoning; hard programming.",
-      "qwen3-coder-next": "Handles: coding. Difficulty: moderate. Thinking: false, deep thinking: false. Best for: cheap agentic coding; local or IDE coding agents.",
-      "perplexity-sonar": "Handles: research. Difficulty: simple. Thinking: true, deep thinking: true. Best for: quick web-grounded answers.",
-      "perplexity-search": "Handles: research. Difficulty: simple. Thinking: false, deep thinking: false. Best for: raw ranked web results; lowest-latency search.",
-      "gemini-3.1-flash-lite-image": "Handles: image_generation, image_editing. Difficulty: simple. Thinking: false, deep thinking: false. Best for: quick local edits; thumbnails and drafts; 1K only.",
-      "grok-imagine-image": "Handles: image_generation, image_editing. Difficulty: simple. Thinking: false, deep thinking: false. Best for: fast cheap images; mockups and social graphics.",
-      "wan2.7-image": "Handles: image_generation, image_editing. Difficulty: complex. Thinking: false, deep thinking: false. Best for: text in 12 languages; multi-reference editing; brand color control.",
-      "flux-2-turbo": "Handles: image_generation, image_editing. Difficulty: moderate. Thinking: false, deep thinking: false. Best for: fast drafts; prompt iteration; quick edits.",
-      "qwen-image-3.0": "Handles: image_generation, image_editing. Difficulty: moderate. Thinking: false, deep thinking: false. Best for: legible small text in images; unified generation and editing; cheap everyday images.",
-      "veo-3.1-fast-generate-001": "Handles: video_generation. Difficulty: moderate. Thinking: false, deep thinking: false. Best for: production clips at 1080p; iteration with audio.",
-      "veo-3.1-lite-generate-preview": "Handles: video_generation. Difficulty: simple. Thinking: false, deep thinking: false. Best for: cheap prototypes; high-volume previews.",
-      "gemini-omni-1.1-flash": "Handles: video_generation, video_editing. Difficulty: moderate. Thinking: false, deep thinking: false. Best for: scene extension; first-last-frame transitions; cheap 360p drafts.",
-      "grok-imagine-video": "Handles: video_generation, video_editing. Difficulty: simple. Thinking: false, deep thinking: false. Best for: short social clips; image-to-video; video edits.",
-      "seedance-2.0-mini": "Handles: video_generation, video_editing. Difficulty: simple. Thinking: false, deep thinking: false. Best for: cheap high-volume clips; e-commerce and UGC.",
-      "kling-v3.0-std": "Handles: video_generation. Difficulty: moderate. Thinking: false, deep thinking: false. Best for: cheaper Kling 3.0 clips; text-to-video and image-to-video; first and last frame control.",
-      "gemini-3.8-flash-tts": "Handles: audio_generation. Difficulty: complex. Thinking: false, deep thinking: false. Best for: audiobooks and narration; multi-speaker dialogue; 130 languages.",
-      "gemini-3.8-flash-lite-tts": "Handles: audio_generation. Difficulty: simple. Thinking: false, deep thinking: false. Best for: real-time voice agents; read-aloud; high volume.",
-      "qwen-audio-3.0-tts-flash": "Handles: audio_generation. Difficulty: simple. Thinking: false, deep thinking: false. Best for: real-time voice under 200ms; Chinese dialects and low-resource languages; emotion and tone control."
+      "none": "The request does not need current information from the web.",
+      "perplexity-sonar": "Most web questions: a short answer based on current web information, with citations.",
+      "perplexity-search": "The user wants a list of links or search results rather than a written answer."
+    }
+  },
+  "image_model": {
+    "type": "choice",
+    "instructions": "Which model should generate or edit the image in this request, if any?",
+    "criteria": {
+      "none": "The request does not ask to create or edit an image. Questions about images or pictures don't count.",
+      "gemini-3.1-flash-lite-image": "Most everyday images and quick edits at standard resolution, including thumbnails.",
+      "qwen-image-3.0": "Images that must contain small readable text, formulas, or text in several languages, such as infographics or labeled diagrams.",
+      "grok-imagine-image": "Quick mockups and social media graphics.",
+      "flux-2-turbo": "Rough drafts or many variations while the user is still iterating, or images larger than standard size (up to 2048 pixels).",
+      "wan2.7-image": "Combining several reference images into one, or matching exact brand colors."
+    }
+  },
+  "video_generation_model": {
+    "type": "choice",
+    "instructions": "Which model should generate the video in this request, if any?",
+    "criteria": {
+      "none": "The request does not ask to create a new video. Questions about videos don't count.",
+      "gemini-omni-1.1-flash": "Most video requests; also extending an existing clip into a longer scene.",
+      "grok-imagine-video": "Short social media clips, or turning a still image into a short video.",
+      "veo-3.1-fast-generate-001": "A finished-quality 1080p clip with synchronized sound.",
+      "kling-v3.0-std": "A clip that must start and end on specific images the user provides.",
+      "seedance-2.0-mini": "Product videos for e-commerce, user-generated-content style clips, or many ad variants at once.",
+      "veo-3.1-lite-generate-preview": "A cheap rough preview of an idea before making the real clip."
+    }
+  },
+  "video_editing_model": {
+    "type": "choice",
+    "instructions": "Which model should edit the video in this request, if any?",
+    "criteria": {
+      "none": "The request does not ask to change an existing video.",
+      "gemini-omni-1.1-flash": "Most video edits; also extending a scene or adding a transition.",
+      "grok-imagine-video": "A quick edit to a short social clip.",
+      "seedance-2.0-mini": "Edits to product or e-commerce style clips, or many variants at once."
+    }
+  },
+  "audio_generation_model": {
+    "type": "choice",
+    "instructions": "Which model should generate the audio in this request, if any?",
+    "criteria": {
+      "none": "The request does not ask to create audio such as speech, a song, or music. Questions about music or audio don't count.",
+      "gemini-3.8-flash-tts": "Most speech: narration, audiobooks, dialogue between two speakers, directed pace or emphasis, and less common languages.",
+      "gemini-3.8-flash-lite-tts": "Reading a short text aloud, real-time voice replies, or many clips at once.",
+      "qwen-audio-3.0-tts-flash": "Chinese dialects, low-resource languages, or speech where a specific emotion or tone is requested."
+    }
+  },
+  "audio_editing_model": {
+    "type": "choice",
+    "instructions": "Which model should edit the audio in this request, if any?",
+    "criteria": {
+      "none": "The request does not ask to change an existing audio file.",
+      "gemini-3.8-flash-tts": "Changes to spoken audio, made by regenerating the speech with the requested changes."
     }
   }
 }
