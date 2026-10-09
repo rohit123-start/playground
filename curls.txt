@@ -3,7 +3,7 @@ Start the server:
 
 POST /jev-open-router-tool -> typesafe/jev through the OpenRouter Decisions API
   body: {"user_query": "..."}
-  returns: {"tools_selected": [{"tool": "web_search", "score": 0.96}]}
+  returns: {"tools_selected": [{"tool": "web_search", "score": 0.96}, {"tool": "none", "score": 0.04}, ...]}  (all tools, highest score first, no threshold)
 
 # bash
 curl -X POST http://localhost:8000/jev-open-router-tool -H "Content-Type: application/json" -d '{"user_query": "who won the Lakers game last night"}'

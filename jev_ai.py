@@ -1,4 +1,5 @@
-"""POST /jev-open-router-tool: tool selection with typesafe/jev through the OpenRouter Decisions API."""
+"""POST /jev-open-router-tool: tool selection with typesafe/jev through the OpenRouter Decisions API.
+Returns every tool with its probability of being needed (no threshold), highest first."""
 import json
 import os
 from pathlib import Path
@@ -18,7 +19,6 @@ OPENROUTER_DECISIONS_URL = os.getenv(
 )
 OPENROUTER_API_KEY = os.getenv("OPEN_ROUTER_API_KEY")
 OPENROUTER_MODEL = os.getenv("JEV_OPEN_ROUTER_AI_MODEL")  # OpenRouter model id
-THRESHOLD = float(os.getenv("DECIDER_THRESHOLD", "0.65"))
 
 # Native noul/choice questions for the OpenRouter Decisions API.
 _QUESTIONS_FILE = Path(__file__).with_name("questions_jev_open_router_tool.json")
@@ -38,15 +38,6 @@ def _probability(answer) -> float | None:
                 if key in probs:
                     return float(probs[key])
     return None
-
-
-def pick_top(scores: dict[str, float]) -> list[tuple[str, float]]:
-    """At most one tool: the highest score at or above THRESHOLD; "none" winning means no tool."""
-    eligible = {k: v for k, v in scores.items() if v >= THRESHOLD}
-    if not eligible:
-        return []
-    top = max(eligible, key=eligible.get)
-    return [] if top == "none" else [(top, eligible[top])]
 
 
 @router.post("/jev-open-router-tool", response_model=SelectResponse)
@@ -72,5 +63,8 @@ async def jev_open_router_tool(req: SelectRequest) -> SelectResponse:
     if not scores:
         raise HTTPException(status_code=502, detail=f"Unrecognised OpenRouter response: {json.dumps(body)}")
     return SelectResponse(
-        tools_selected=[SelectedTool(tool=k, score=round(v, 4)) for k, v in pick_top(scores)]
+        tools_selected=[
+            SelectedTool(tool=k, score=round(v, 4))
+            for k, v in sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+        ]
     )

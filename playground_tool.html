@@ -122,7 +122,7 @@
       return "no tool";
     }
     for (const t of body.tools_selected) out.append(scoreBar(t.tool, t.score));
-    return body.tools_selected.map((t) => t.tool).join(", ");
+    return body.tools_selected.slice(0, 3).map((t) => t.tool + " (" + t.score.toFixed(2) + ")").join(", ");
   }
   const $ = (id) => document.getElementById(id);
   const q = $("q"), send = $("send");
