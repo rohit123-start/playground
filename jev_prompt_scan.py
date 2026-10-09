@@ -1,13 +1,14 @@
 """POST /jev-prompt-scan-open-router: model/tool routing + context routing with typesafe/jev
 through the OpenRouter Decisions API. Two independent choice questions, one call."""
+import json
 import os
 import time
 
-import httpx
 from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+import openrouter
 from schemas import SelectRequest
 
 load_dotenv()
@@ -70,6 +71,7 @@ class Decision(BaseModel):
 class PromptScanResponse(BaseModel):
     model_routing: Decision
     context_routing: Decision
+    cached: bool  # served from the in-process cache, no OpenRouter call
     latency_ms: int
 
 
@@ -97,23 +99,15 @@ async def jev_prompt_scan_open_router(req: PromptScanRequest) -> PromptScanRespo
     if req.metadata:
         state["metadata"] = req.metadata
     start = time.perf_counter()
-    try:
-        async with httpx.AsyncClient(timeout=60) as http:
-            r = await http.post(
-                OPENROUTER_DECISIONS_URL,
-                headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
-                json={"model": OPENROUTER_MODEL, "state": state, "questions": questions},
-            )
-    except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"OpenRouter call failed: {e}")
-    if r.status_code != 200:
-        raise HTTPException(status_code=502, detail=f"OpenRouter {r.status_code}: {r.text}")
-
-    answers = r.json().get("answers")
+    body, cached = await openrouter.post_decision(
+        OPENROUTER_DECISIONS_URL, OPENROUTER_API_KEY, OPENROUTER_MODEL, state, questions
+    )
+    answers = body.get("answers")
     if not isinstance(answers, dict):
-        raise HTTPException(status_code=502, detail=f"Unrecognised OpenRouter response: {r.text}")
+        raise HTTPException(status_code=502, detail=f"Unrecognised OpenRouter response: {json.dumps(body)}")
     return PromptScanResponse(
         model_routing=_decision("model_routing", answers.get("model_routing")),
         context_routing=_decision("context_routing", answers.get("context_routing")),
+        cached=cached,
         latency_ms=round((time.perf_counter() - start) * 1000),
     )

@@ -166,6 +166,7 @@
     const meta = [el("span", {}, "Status ", el("b", {}, status || "network error")),
                   el("span", {}, "Round trip ", el("b", {}, ms + " ms"))];
     if (ok && body.latency_ms !== undefined) meta.push(el("span", {}, "Server ", el("b", {}, body.latency_ms + " ms")));
+    if (ok && body.cached) meta.push(el("span", {}, "Cache ", el("b", {}, "hit")));
     $("meta").replaceChildren(...meta);
     const out = $("tools");
     out.replaceChildren();

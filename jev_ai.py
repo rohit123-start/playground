@@ -3,10 +3,10 @@ import json
 import os
 from pathlib import Path
 
-import httpx
 from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 
+import openrouter
 from schemas import SelectedTool, SelectRequest, SelectResponse
 
 load_dotenv()
@@ -56,30 +56,21 @@ async def jev_open_router_tool(req: SelectRequest) -> SelectResponse:
             status_code=500,
             detail="Set JEV_OPEN_ROUTER_AI_MODEL and OPEN_ROUTER_API_KEY environment variables",
         )
-    try:
-        async with httpx.AsyncClient(timeout=60) as http:
-            r = await http.post(
-                OPENROUTER_DECISIONS_URL,
-                headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
-                json={
-                    "model": OPENROUTER_MODEL,
-                    "state": {"user_request": req.user_query},
-                    "questions": questions,
-                },
-            )
-    except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"OpenRouter call failed: {e}")
-    if r.status_code != 200:
-        raise HTTPException(status_code=502, detail=f"OpenRouter {r.status_code}: {r.text}")
-
-    answers = r.json().get("answers")
+    body, _ = await openrouter.post_decision(
+        OPENROUTER_DECISIONS_URL,
+        OPENROUTER_API_KEY,
+        OPENROUTER_MODEL,
+        {"user_request": req.user_query},
+        questions,
+    )
+    answers = body.get("answers")
     scores = {}
     for k in questions:
         p = _probability(answers.get(k)) if isinstance(answers, dict) else None
         if p is not None:
             scores[k] = p
     if not scores:
-        raise HTTPException(status_code=502, detail=f"Unrecognised OpenRouter response: {r.text}")
+        raise HTTPException(status_code=502, detail=f"Unrecognised OpenRouter response: {json.dumps(body)}")
     return SelectResponse(
         tools_selected=[SelectedTool(tool=k, score=round(v, 4)) for k, v in pick_top(scores)]
     )

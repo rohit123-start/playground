@@ -6,11 +6,11 @@ import os
 import time
 from pathlib import Path
 
-import httpx
 from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+import openrouter
 from jev_prompt_scan import Decision, PromptScanRequest, _decision
 
 load_dotenv()
@@ -39,6 +39,7 @@ class ModelPickResponse(BaseModel):
     tier: str
     selected: dict[str, str | None]  # capability -> chosen model, or None when "none" won
     decisions: dict[str, Decision]  # capability -> full decision with probabilities
+    cached: bool  # served from the in-process cache, no OpenRouter call
     latency_ms: int
 
 
@@ -53,26 +54,18 @@ def _make_handler(tier: str):
         if req.metadata:
             state["metadata"] = req.metadata
         start = time.perf_counter()
-        try:
-            async with httpx.AsyncClient(timeout=60) as http:
-                r = await http.post(
-                    OPENROUTER_DECISIONS_URL,
-                    headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
-                    json={"model": OPENROUTER_MODEL, "state": state, "questions": questions[tier]},
-                )
-        except httpx.HTTPError as e:
-            raise HTTPException(status_code=502, detail=f"OpenRouter call failed: {e}")
-        if r.status_code != 200:
-            raise HTTPException(status_code=502, detail=f"OpenRouter {r.status_code}: {r.text}")
-
-        answers = r.json().get("answers")
+        body, cached = await openrouter.post_decision(
+            OPENROUTER_DECISIONS_URL, OPENROUTER_API_KEY, OPENROUTER_MODEL, state, questions[tier]
+        )
+        answers = body.get("answers")
         if not isinstance(answers, dict):
-            raise HTTPException(status_code=502, detail=f"Unrecognised OpenRouter response: {r.text}")
+            raise HTTPException(status_code=502, detail=f"Unrecognised OpenRouter response: {json.dumps(body)}")
         decisions = {name: _decision(name, answers.get(name)) for name in questions[tier]}
         return ModelPickResponse(
             tier=tier,
             selected={n: (None if d.choice == "none" else d.choice) for n, d in decisions.items()},
             decisions=decisions,
+            cached=cached,
             latency_ms=round((time.perf_counter() - start) * 1000),
         )
 
