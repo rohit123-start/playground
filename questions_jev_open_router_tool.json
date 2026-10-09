@@ -17,34 +17,34 @@
   },
   "file_processing": {
     "type": "noul",
-    "instructions": "Is processing of an existing user-provided file required?",
+    "instructions": "Is processing a newly provided file required?",
     "criteria": {
-      "true": "The user has provided an existing file and the request requires reading, extracting, searching, analyzing, converting, merging, splitting, transforming, or otherwise processing that file.",
-      "false": "There is no existing user-provided file that needs to be processed. Creating a new PDF, document, spreadsheet, presentation, image, audio, or video is generation, not file processing."
+      "true": "The current request requires processing a newly provided PDF, Word document, spreadsheet, text file, CSV, ZIP archive, or other non-image, non-audio, non-video file.",
+      "false": "No new file requires processing, the file was already processed and stored, or a dedicated capability handles it (image_analysis, audio_processing, video_processing)."
     }
   },
   "image_analysis": {
     "type": "noul",
-    "instructions": "Is analysis of an existing user-provided image required?",
+    "instructions": "Is analysis of a newly provided image required?",
     "criteria": {
-      "true": "The user has provided an existing image and the request requires analyzing, understanding, interpreting, extracting information from, comparing, or otherwise processing that image.",
-      "false": "No existing user-provided image needs to be analyzed. Creating or generating an image is image generation, not image analysis."
+      "true": "The current request requires analyzing, interpreting, extracting information from, or comparing a newly provided image.",
+      "false": "No new image requires analysis, the image was already processed and stored, or the request is to generate an image."
     }
   },
   "audio_processing": {
     "type": "noul",
-    "instructions": "Is processing of existing user-provided audio required?",
+    "instructions": "Is processing newly provided audio required?",
     "criteria": {
-      "true": "The user has provided existing audio and the request requires transcribing, analyzing, interpreting, extracting, converting, or otherwise processing that audio.",
-      "false": "No existing user-provided audio needs to be processed. Creating or generating audio is audio generation, not audio processing."
+      "true": "The current request requires transcribing, analyzing, extracting information from, or converting newly provided audio.",
+      "false": "No new audio requires processing, the audio was already processed and stored, or the request is to generate audio."
     }
   },
   "video_processing": {
     "type": "noul",
-    "instructions": "Is processing of an existing user-provided video required?",
+    "instructions": "Is processing a newly provided video required?",
     "criteria": {
-      "true": "The user has provided an existing video and the request requires analyzing, understanding, summarizing, transcribing, extracting, comparing, converting, or otherwise processing that video.",
-      "false": "No existing user-provided video needs to be processed. Creating or generating a video is video generation, not video processing."
+      "true": "The current request requires analyzing, summarizing, transcribing, extracting information from, or converting a newly provided video.",
+      "false": "No new video requires processing, the video was already processed and stored, or the request is to generate video."
     }
   },
   "image_generation": {
