@@ -4,15 +4,15 @@
     "instructions": "Is web search required to fulfill this request?",
     "criteria": {
       "true": "The request explicitly asks to search, browse, look up, find online, or use web search, or requires current, recent, live, external, or internet-only information.",
-      "false": "The request can be fulfilled using the available context, provided files, or existing knowledge without accessing the web. General knowledge questions, explanations, definitions, creative requests, and content-generation requests are false unless web information is required."
+      "false": "The request can be fulfilled using available context, provided files, or existing knowledge without accessing the web."
     }
   },
   "code_execution": {
     "type": "noul",
     "instructions": "Is code execution required to fulfill this request?",
     "criteria": {
-      "true": "The request requires actually running code, executing a program, performing programmatic calculations, computational data processing, programmatic file manipulation, or another operation that requires an execution environment.",
-      "false": "The request can be fulfilled without actually executing code. Do not select this merely because the task involves numbers, logic, technical content, or something that could optionally be done with code."
+      "true": "The request requires running code, executing a program, performing programmatic calculations, computational data processing, or programmatic file manipulation.",
+      "false": "The request can be fulfilled without actually executing code."
     }
   },
   "file_processing": {
@@ -28,7 +28,7 @@
     "instructions": "Is analysis of a newly provided image required?",
     "criteria": {
       "true": "The current request requires analyzing, interpreting, extracting information from, or comparing a newly provided image.",
-      "false": "No new image requires analysis, the image was already processed and stored, or the request is to generate an image."
+      "false": "No new image requires analysis, the image was already processed and stored, or the request is to generate or modify an image."
     }
   },
   "audio_processing": {
@@ -36,7 +36,7 @@
     "instructions": "Is processing newly provided audio required?",
     "criteria": {
       "true": "The current request requires transcribing, analyzing, extracting information from, or converting newly provided audio.",
-      "false": "No new audio requires processing, the audio was already processed and stored, or the request is to generate audio."
+      "false": "No new audio requires processing, the audio was already processed and stored, or the request is to generate or modify audio."
     }
   },
   "video_processing": {
@@ -44,71 +44,71 @@
     "instructions": "Is processing a newly provided video required?",
     "criteria": {
       "true": "The current request requires analyzing, summarizing, transcribing, extracting information from, or converting a newly provided video.",
-      "false": "No new video requires processing, the video was already processed and stored, or the request is to generate video."
+      "false": "No new video requires processing, the video was already processed and stored, or the request is to generate or modify video."
     }
   },
   "image_generation": {
     "type": "noul",
-    "instructions": "Is a standalone image the requested final output?",
+    "instructions": "Is image generation required?",
     "criteria": {
-      "true": "The user explicitly asks to create, generate, draw, make, edit, modify, transform, or produce an image, picture, illustration, artwork, photo, graphic, or other standalone image output.",
-      "false": "The user does not explicitly request a standalone image as the final output. Do not select this for presentations, slideshows, pitch decks, PDFs, documents, spreadsheets, web searches, explanations, or content that may contain images."
+      "true": "The user asks to create, generate, draw, make, edit, modify, or transform an image, picture, illustration, artwork, photo, or graphic.",
+      "false": "The request does not require creating or modifying an image."
     }
   },
   "video_generation": {
     "type": "noul",
-    "instructions": "Is a standalone video the requested final output?",
+    "instructions": "Is video generation required?",
     "criteria": {
-      "true": "The user explicitly asks to create, generate, make, edit, modify, transform, or produce a video as the final output.",
-      "false": "The user does not explicitly request a video as the final output."
+      "true": "The user asks to create, generate, make, edit, modify, or transform a video.",
+      "false": "The request does not require creating or modifying a video."
     }
   },
   "audio_generation": {
     "type": "noul",
-    "instructions": "Is standalone audio the requested final output?",
+    "instructions": "Is audio generation required?",
     "criteria": {
-      "true": "The user explicitly asks to create, generate, make, edit, modify, or produce speech, voice, music, sound effects, or another standalone audio output.",
-      "false": "The user does not explicitly request standalone audio as the final output."
+      "true": "The user asks to create, generate, make, edit, modify, or transform speech, voice, music, or sound effects.",
+      "false": "The request does not require creating or modifying audio."
     }
   },
   "pdf_generation": {
     "type": "noul",
-    "instructions": "Is a PDF explicitly requested as the final output?",
+    "instructions": "Is PDF generation required?",
     "criteria": {
-      "true": "The user explicitly requests a PDF, PDF file, PDF document, PDF report, PDF export, or asks for the result to be delivered or saved as a PDF.",
-      "false": "The user does not explicitly request PDF as the final output. Merely mentioning PDFs, asking what a PDF is, or requesting another output format is false."
+      "true": "The user explicitly requests creating, generating, exporting, or delivering the result as a PDF.",
+      "false": "The user does not request a PDF as the output format."
     }
   },
   "document_generation": {
     "type": "noul",
-    "instructions": "Is an editable document explicitly requested as the final output?",
+    "instructions": "Is document generation required?",
     "criteria": {
-      "true": "The user explicitly requests a Word document, DOCX, editable document, or another editable document file as the final output.",
-      "false": "The user does not explicitly request an editable document as the final output. PDFs, presentations, spreadsheets, images, and general content are false."
+      "true": "The user explicitly requests creating or delivering an editable document, such as a Word document or DOCX file.",
+      "false": "The user does not request an editable document as the output format."
     }
   },
   "spreadsheet_generation": {
     "type": "noul",
-    "instructions": "Is a spreadsheet explicitly requested as the final output?",
+    "instructions": "Is spreadsheet generation required?",
     "criteria": {
-      "true": "The user explicitly requests a spreadsheet, Excel file, XLSX, CSV, or another spreadsheet file as the final output.",
-      "false": "The user does not explicitly request a spreadsheet as the final output."
+      "true": "The user explicitly requests creating or delivering a spreadsheet, such as an Excel, XLSX, or CSV file.",
+      "false": "The user does not request a spreadsheet as the output format."
     }
   },
   "presentation_generation": {
     "type": "noul",
-    "instructions": "Is a presentation or slide deck explicitly requested as the final output?",
+    "instructions": "Is presentation generation required?",
     "criteria": {
-      "true": "The user explicitly asks to create, generate, make, or produce a presentation, PowerPoint, PPTX, slide deck, slideshow, investor deck, pitch deck, or presentation slides as the final output.",
-      "false": "The user does not explicitly request a presentation or slide-based output. PDFs, editable documents, spreadsheets, images, web searches, and general content are false."
+      "true": "The user asks to create or deliver a presentation, PowerPoint, PPTX, slide deck, slideshow, investor deck, or pitch deck.",
+      "false": "The user does not request a presentation or slide-based output."
     }
   },
   "none": {
     "type": "noul",
-    "instructions": "Are none of the above capabilities required to fulfill this request?",
+    "instructions": "Are none of the above capabilities required?",
     "criteria": {
-      "true": "The request can be fulfilled directly using the assistant's existing knowledge, reasoning, conversation context, or text generation without web search, code execution, file processing, image/audio/video analysis, or image/audio/video/PDF/document/spreadsheet/presentation generation.",
-      "false": "At least one of the other capabilities is required to fulfill the request."
+      "true": "The request can be fulfilled using existing knowledge, reasoning, conversation context, or text generation without any of the capabilities above.",
+      "false": "At least one of the capabilities above is required to fulfill the request."
     }
   }
 }

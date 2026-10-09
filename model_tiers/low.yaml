@@ -40,21 +40,22 @@ choices:
     instructions: Which model should search the web for this request, if any?
     criteria:
       none: >-
-        The request does not need current information from the web.
+        Anything that can be answered or made without looking things up online,
+        including requests to create or edit an image, video, or audio.
       perplexity-sonar: >-
-        Most web questions: a short answer based on current web information, with
-        citations.
+        Questions about recent events, news, prices, or facts that may have changed,
+        needing a short answer with citations.
       perplexity-search: >-
-        The user wants a list of links or search results rather than a written
-        answer.
+        The user explicitly asks for links, sources, or a list of web pages about a
+        topic.
 
   image_model:
     type: choice
     instructions: Which model should generate or edit the image in this request, if any?
     criteria:
       none: >-
-        The request does not ask to create or edit an image. Questions about images
-        or pictures don't count.
+        Anything other than making or changing an image, including questions about
+        pictures and requests for only a video or audio.
       gemini-3.1-flash-lite-image: >-
         Most everyday images and quick edits at standard resolution, including
         thumbnails.
@@ -74,8 +75,8 @@ choices:
     instructions: Which model should generate the video in this request, if any?
     criteria:
       none: >-
-        The request does not ask to create a new video. Questions about videos don't
-        count.
+        Anything other than making a new video, including questions about videos and
+        requests for only an image or audio.
       gemini-omni-1.1-flash: >-
         Most video requests; also extending an existing clip into a longer scene.
       grok-imagine-video: >-
@@ -95,7 +96,7 @@ choices:
     instructions: Which model should edit the video in this request, if any?
     criteria:
       none: >-
-        The request does not ask to change an existing video.
+        Anything other than changing an existing video the user provides.
       gemini-omni-1.1-flash: >-
         Most video edits; also extending a scene or adding a transition.
       grok-imagine-video: >-
@@ -108,8 +109,8 @@ choices:
     instructions: Which model should generate the audio in this request, if any?
     criteria:
       none: >-
-        The request does not ask to create audio such as speech, a song, or music.
-        Questions about music or audio don't count.
+        Anything other than making new audio such as speech, a song, or music,
+        including questions about music or audio.
       gemini-3.8-flash-tts: >-
         Most speech: narration, audiobooks, dialogue between two speakers, directed
         pace or emphasis, and less common languages.
@@ -124,7 +125,7 @@ choices:
     instructions: Which model should edit the audio in this request, if any?
     criteria:
       none: >-
-        The request does not ask to change an existing audio file.
+        Anything other than changing an existing audio file the user provides.
       gemini-3.8-flash-tts: >-
         Changes to spoken audio, made by regenerating the speech with the requested
         changes.
