@@ -5,12 +5,10 @@
     "criteria": {
       "glm-5.3-flash": "Most requests: general questions, explanations, and everyday coding; also reading text from screenshots or scanned documents, and multi-step tasks that use tools, browse a website, call an API, or work through a document step by step.",
       "gemini-3.8-flash": "Analysis, including finance or legal analysis, multi-step science or engineering reasoning, system design and architecture questions such as scalability, concurrency, race conditions, or deadlocks, and questions about attached videos, audio, or PDFs.",
-      "deepseek-v4.1-flash": "Math: equations, proofs, derivations, or calculations; coding tasks; and finding information inside a very long text.",
+      "deepseek-v4.1-flash": "Math: equations, proofs, derivations, or calculations; coding tasks, including pure coding with no explanation or conversation needed; and finding information inside a very long text.",
       "qwen3.8-flash": "Questions about what is in an attached image, such as identifying or locating objects; building web pages, landing pages, UI components, or dashboards, including from a design or screenshot.",
-      "gpt-6-luna": "Classifying, extracting, tagging, or labeling information from text or documents.",
-      "gpt-5.4-mini": "Writing tasks such as an email, a rewrite, or a short essay, and creative writing such as stories, dialogue, roleplay, or characters.",
+      "gpt-6-luna": "Writing tasks such as an email, a rewrite, or a short essay; creative writing such as stories, dialogue, roleplay, or characters; and classifying, extracting, tagging, or labeling information from text or documents.",
       "claude-haiku-4-5": "Very simple questions where the fastest possible reply matters most.",
-      "qwen3-coder-next": "A pure coding task with no explanation or conversation needed.",
       "none": "The request only asks to generate or edit an image, video, or audio, and that output is the whole reply."
     }
   },

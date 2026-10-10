@@ -11,7 +11,9 @@ choices:
         characters.
       gpt-6.1-sol: >-
         Agent work that automates a workflow across several tools or steps,
-        operating a computer, or technical and scientific tasks.
+        operating a computer, technical and scientific tasks, and pure coding tasks
+        for an agent to carry out in a terminal: write, fix, refactor, test, or
+        debug code with no general conversation needed.
       grok-4.7: >-
         Legal analysis, quick one-shot scripts, and system design questions such as
         concurrency, scalability, or distributed systems.
@@ -26,9 +28,6 @@ choices:
         Analysis of long documents, contracts, transcripts, or knowledge bases,
         business process automation, and classifying, extracting, tagging, or
         labeling information from text or documents.
-      gpt-5.3-codex: >-
-        A pure coding task for an agent to carry out in a terminal: write, fix,
-        refactor, test, or debug code, with no general conversation needed.
       gemini-3.1-pro-preview: >-
         Math: proofs, equations, derivations, or calculations; also abstract
         reasoning and logic puzzles.

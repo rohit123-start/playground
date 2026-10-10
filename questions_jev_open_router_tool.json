@@ -3,16 +3,24 @@
     "type": "noul",
     "instructions": "Is web search required to fulfill this request?",
     "criteria": {
-      "true": "The request explicitly asks to search, browse, look up, find online, or use web search, or requires current, recent, live, external, or internet-only information.",
+      "true": "The user explicitly asks to search, browse, look up, find online, or use web search, or the request requires current, recent, live, external, or internet-only information.",
       "false": "The request can be fulfilled using available context, provided files, or existing knowledge without accessing the web."
+    }
+  },
+  "research": {
+    "type": "noul",
+    "instructions": "Is in-depth research required?",
+    "criteria": {
+      "true": "The user requests deep research, comprehensive investigation, evidence-based analysis across multiple sources, or a detailed research report requiring external information.",
+      "false": "The request needs only a quick lookup, a straightforward answer, or no external research."
     }
   },
   "code_execution": {
     "type": "noul",
-    "instructions": "Is code execution required to fulfill this request?",
+    "instructions": "Is code execution required?",
     "criteria": {
-      "true": "The request requires running code, executing a program, performing programmatic calculations, computational data processing, or programmatic file manipulation.",
-      "false": "The request can be fulfilled without actually executing code."
+      "true": "The request requires actually running code, executing a program, performing programmatic calculations, computational data processing, or programmatic file manipulation.",
+      "false": "The request can be fulfilled without executing code."
     }
   },
   "file_processing": {
@@ -81,7 +89,7 @@
   },
   "document_generation": {
     "type": "noul",
-    "instructions": "Is document generation required?",
+    "instructions": "Is editable document generation required?",
     "criteria": {
       "true": "The user explicitly requests creating or delivering an editable document, such as a Word document or DOCX file.",
       "false": "The user does not request an editable document as the output format."
@@ -101,6 +109,14 @@
     "criteria": {
       "true": "The user asks to create or deliver a presentation, PowerPoint, PPTX, slide deck, slideshow, investor deck, or pitch deck.",
       "false": "The user does not request a presentation or slide-based output."
+    }
+  },
+  "artifact": {
+    "type": "noul",
+    "instructions": "Is a structured digital artifact required?",
+    "criteria": {
+      "true": "The user requests creating or modifying a structured deliverable, such as a website, web app, interactive UI, dashboard, prototype, diagram, flowchart, or other artifact that requires a dedicated artifact-building capability.",
+      "false": "The request can be fulfilled with ordinary text, code snippets, explanations, or one of the dedicated file-generation capabilities above."
     }
   },
   "none": {

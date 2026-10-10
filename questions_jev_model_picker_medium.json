@@ -4,12 +4,11 @@
     "instructions": "Which model should write the reply to this request, if any?",
     "criteria": {
       "claude-sonnet-5-5": "Most requests: questions, explanations, advice, writing and rewriting, everyday coding, command-line work, and professional deliverables; also creative writing such as stories, screenplays, dialogue, roleplay, and characters.",
-      "gpt-6.1-sol": "Agent work that automates a workflow across several tools or steps, operating a computer, or technical and scientific tasks.",
+      "gpt-6.1-sol": "Agent work that automates a workflow across several tools or steps, operating a computer, technical and scientific tasks, and pure coding tasks for an agent to carry out in a terminal: write, fix, refactor, test, or debug code with no general conversation needed.",
       "grok-4.7": "Legal analysis, quick one-shot scripts, and system design questions such as concurrency, scalability, or distributed systems.",
       "qwen3.8-max-0902": "The request is in Chinese or bilingual, or it has many strict formatting or instruction constraints, or it involves reading papers, or quick UI prototyping.",
       "glm-5.3": "Cybersecurity work such as finding or analysing vulnerabilities, changes across many files in a repository, or long-horizon coding agents.",
       "gpt-5.6-terra": "Analysis of long documents, contracts, transcripts, or knowledge bases, business process automation, and classifying, extracting, tagging, or labeling information from text or documents.",
-      "gpt-5.3-codex": "A pure coding task for an agent to carry out in a terminal: write, fix, refactor, test, or debug code, with no general conversation needed.",
       "gemini-3.1-pro-preview": "Math: proofs, equations, derivations, or calculations; also abstract reasoning and logic puzzles.",
       "none": "The request only asks to generate or edit an image, video, or audio, and that output is the whole reply."
     }
