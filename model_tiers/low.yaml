@@ -56,14 +56,14 @@ choices:
       none: >-
         Anything other than making or changing an image, including questions about
         pictures and requests for only a video or audio.
+      grok-imagine-image-2.0: >-
+        Most everyday images and edits; also quick mockups and social media
+        graphics.
       gemini-3.1-flash-lite-image: >-
-        Most everyday images and quick edits at standard resolution, including
-        thumbnails.
+        Small quick edits to an existing image, and thumbnails.
       qwen-image-3.0: >-
         Images that must contain small readable text, formulas, or text in several
         languages, such as infographics or labeled diagrams.
-      grok-imagine-image: >-
-        Quick mockups and social media graphics.
       flux-2-turbo: >-
         Rough drafts or many variations while the user is still iterating, or images
         larger than standard size (up to 2048 pixels).
@@ -79,7 +79,7 @@ choices:
         requests for only an image or audio.
       gemini-omni-1.1-flash: >-
         Most video requests; also extending an existing clip into a longer scene.
-      grok-imagine-video: >-
+      grok-imagine-video-1.5: >-
         Short social media clips, or turning a still image into a short video.
       veo-3.1-fast-generate-001: >-
         A finished-quality 1080p clip with synchronized sound.
@@ -88,8 +88,9 @@ choices:
       seedance-2.0-mini: >-
         Product videos for e-commerce, user-generated-content style clips, or many
         ad variants at once.
-      veo-3.1-lite-generate-preview: >-
-        A cheap rough preview of an idea before making the real clip.
+      grok-imagine-video-1.5-lite: >-
+        A cheap rough preview or draft of an idea before making the real clip,
+        including short drafts with spoken dialogue.
 
   video_editing_model:
     type: choice
