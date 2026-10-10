@@ -4,25 +4,32 @@ choices:
     type: choice
     instructions: Which model should write the reply to this request, if any?
     criteria:
-      claude-opus-5-5: >-
-        Most requests: questions, explanations, advice, in-depth analysis,
-        research-style knowledge work, long-form writing, coding, and system design;
-        polished customer-facing replies and business documents; classifying,
-        extracting, tagging, or labeling information from text; and creative writing
-        such as stories, screenplays, dialogue, roleplay, and characters.
       gpt-6-astra: >-
         Long agent runs that use many tools or operate a terminal or computer, large
         code migrations, high-stakes work where a factual mistake would be costly, a
         single very hard problem that needs long careful thought such as difficult
         logic or tricky quantitative analysis, and math: proofs, equations,
-        derivations, or competition-level problems.
+        derivations, or competition-level problems. Also work on content from a
+        provided file, image, audio, or video: extracting data, tables, or key
+        fields from it, converting it to another format, or turning a transcript
+        into clean text.
+      claude-opus-5-5: >-
+        Most requests: questions, explanations, advice, in-depth analysis,
+        research-style knowledge work, long-form writing, coding, and system design;
+        polished customer-facing replies and business documents; classifying,
+        extracting, tagging, or labeling information from text; and creative writing
+        such as stories, screenplays, dialogue, roleplay, and characters. Also work
+        on content from a provided file, image, audio, or video: summarizing it,
+        answering questions about it, explaining or analyzing it, or rewriting it.
       kimi-k3: >-
         The request is in Chinese or is bilingual Chinese/English, or it is
         long-horizon coding across a large repository, or it involves a very long
         document.
       none: >-
         The request only asks to generate or edit an image, video, or audio, and
-        that output is the whole reply.
+        that output is the whole reply. Requests to summarize, transcribe, analyze,
+        or answer questions about a provided file, image, audio, or video do not
+        count.
 
   search_model:
     type: choice

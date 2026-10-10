@@ -4,16 +4,25 @@ choices:
     type: choice
     instructions: Which model should write the reply to this request, if any?
     criteria:
-      claude-sonnet-5-5: >-
-        Most requests: questions, explanations, advice, writing and rewriting,
-        everyday coding, command-line work, and professional deliverables; also
-        creative writing such as stories, screenplays, dialogue, roleplay, and
-        characters.
       gpt-6.1-sol: >-
         Agent work that automates a workflow across several tools or steps,
         operating a computer, technical and scientific tasks, and pure coding tasks
         for an agent to carry out in a terminal: write, fix, refactor, test, or
         debug code with no general conversation needed.
+      gpt-5.6-terra: >-
+        Analysis of long documents, contracts, transcripts, or knowledge bases,
+        business process automation, and classifying, extracting, tagging, or
+        labeling information from text or documents. Also work on content from a
+        provided file, image, audio, or video: extracting data, tables, or key
+        fields from it, converting it to another format, or turning a transcript
+        into clean text.
+      claude-sonnet-5-5: >-
+        Most requests: questions, explanations, advice, writing and rewriting,
+        everyday coding, command-line work, and professional deliverables; also
+        creative writing such as stories, screenplays, dialogue, roleplay, and
+        characters. Also work on content from a provided file, image, audio, or
+        video: summarizing it, answering questions about it, explaining or analyzing
+        it, or rewriting it.
       grok-4.7: >-
         Legal analysis, quick one-shot scripts, and system design questions such as
         concurrency, scalability, or distributed systems.
@@ -24,16 +33,14 @@ choices:
       glm-5.3: >-
         Cybersecurity work such as finding or analysing vulnerabilities, changes
         across many files in a repository, or long-horizon coding agents.
-      gpt-5.6-terra: >-
-        Analysis of long documents, contracts, transcripts, or knowledge bases,
-        business process automation, and classifying, extracting, tagging, or
-        labeling information from text or documents.
       gemini-3.1-pro-preview: >-
         Math: proofs, equations, derivations, or calculations; also abstract
         reasoning and logic puzzles.
       none: >-
         The request only asks to generate or edit an image, video, or audio, and
-        that output is the whole reply.
+        that output is the whole reply. Requests to summarize, transcribe, analyze,
+        or answer questions about a provided file, image, audio, or video do not
+        count.
 
   search_model:
     type: choice
@@ -53,6 +60,12 @@ choices:
       none: >-
         Anything other than making or changing an image, including questions about
         pictures and requests for only a video or audio.
+      gpt-image-2.5-sunburst: >-
+        Precise targeted edits, product imagery, or a series of revisions that must
+        keep the same subject consistent across several turns.
+      gpt-image-2.5-flare: >-
+        Fast concept drafts, social images, and quick visual exploration while the
+        user is still trying ideas.
       gemini-3.1-flash-image: >-
         Most images and edits; also images with text in a language other than
         English, very high resolution (up to 4K), or real-world subjects that need
@@ -61,12 +74,6 @@ choices:
         Dense layouts such as infographics, multi-panel grids, exam sheets, or
         posters with very small readable text or formulas, and restoring damaged
         images.
-      gpt-image-2.5-sunburst: >-
-        Precise targeted edits, product imagery, or a series of revisions that must
-        keep the same subject consistent across several turns.
-      gpt-image-2.5-flare: >-
-        Fast concept drafts, social images, and quick visual exploration while the
-        user is still trying ideas.
 
   video_generation_model:
     type: choice
