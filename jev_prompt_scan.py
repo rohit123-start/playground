@@ -1,5 +1,5 @@
-"""POST /jev-prompt-scan-open-router: model/tool routing + context routing with typesafe/jev
-through the OpenRouter Decisions API. Two independent choice questions, one call."""
+"""POST /jev-prompt-scan-open-router: model routing plus history/memory/file/media checks with typesafe/jev
+through the OpenRouter Decisions API. Independent questions, one call."""
 import json
 import os
 import time
@@ -21,37 +21,181 @@ OPENROUTER_DECISIONS_URL = os.getenv(
 OPENROUTER_API_KEY = os.getenv("OPEN_ROUTER_API_KEY")
 OPENROUTER_MODEL = os.getenv("JEV_OPEN_ROUTER_AI_MODEL")  # OpenRouter model id
 
-# Option names are the returned values.
+# Option names are the returned values. The API has only choice/score/noul types, so the yes/no\n# questions are choices with "true"/"false" options.
 questions = {
     "model_routing": {
         "type": "choice",
         "instructions": (
-            "Does this request require a specific model or tool, or can the default model handle it?"
+            "Does this request require a specialized model or tool, "
+            "or can the default LLM handle it adequately?"
         ),
         "criteria": {
             "default_model": (
-                "The default LLM can fulfill the request without a specialized model or tool."
+                "The default LLM can fulfill the entire request "
+                "adequately, considering its complexity, reasoning, "
+                "quality, and capability requirements."
             ),
             "specific_model_or_tool": (
-                "The request requires a specialized model or tool, such as web search, image "
-                "generation, code execution, audio processing, video processing, etc."
+                "The request requires a specialized model or tool "
+                "because the default LLM cannot adequately fulfill "
+                "the entire request. Consider task complexity, "
+                "reasoning requirements, coding difficulty, quality "
+                "requirements, and specialized capabilities. This "
+                "includes complex reasoning, advanced coding, web "
+                "research, image generation, video generation, and "
+                "other specialized tasks. Evaluate the entire request, "
+                "even when a dedicated file or media processing "
+                "question also applies."
             ),
         },
     },
-    "context_routing": {
+    "conversation_history": {
         "type": "choice",
-        "instructions": "Does this request require additional context?",
+        "instructions": (
+            "Is previous conversation history required to fulfill "
+            "the current request?"
+        ),
         "criteria": {
-            "context_yes": (
-                "The answer requires information provided before the current request, such as "
-                "previous conversation, previous tool results, previously processed files, "
-                "memory, or earlier outputs."
+            "true": (
+                "The request requires information from previous messages, "
+                "earlier decisions, previous conversation turns, or "
+                "earlier assistant responses."
             ),
-            "context_no": (
-                "The request can be fulfilled using only the current request and its direct "
-                "inputs. This includes files, attachments, and their metadata provided with the "
-                "current request. Current-request inputs are not context. For unclear, "
-                "meaningless, random, or self-contained input, choose context_no."
+            "false": (
+                "The request can be fulfilled without information "
+                "from previous conversation history."
+            ),
+        },
+    },
+    "memory_context": {
+        "type": "choice",
+        "instructions": (
+            "Is saved user memory required to fulfill the current request?"
+        ),
+        "criteria": {
+            "true": (
+                "The request requires relevant information from persistent "
+                "user memory, such as saved preferences, decisions, "
+                "or previously stored details."
+            ),
+            "false": (
+                "The request can be fulfilled without retrieving "
+                "saved user memory."
+            ),
+        },
+    },
+    "previous_files_context": {
+        "type": "choice",
+        "instructions": (
+            "Are previously uploaded or processed files required "
+            "to fulfill the current request?"
+        ),
+        "available_previous_files": (
+            "Dynamically populated with available file metadata "
+            "from the database for the current user."
+        ),
+        "criteria": {
+            "true": (
+                "The request requires information from one or more "
+                "previously uploaded or processed files. Use the user "
+                "request and available file metadata to identify "
+                "potentially relevant files. Metadata may include file IDs, "
+                "filenames, file types, descriptions, extracted content "
+                "summaries, and processing status."
+            ),
+            "false": (
+                "The request does not require information from previously "
+                "uploaded or processed files. Files provided with the "
+                "current message are handled through current-message "
+                "input processing and semantic search."
+            ),
+        },
+    },
+    "file_processing": {
+        "type": "choice",
+        "instructions": (
+            "Does the current request require processing a newly "
+            "provided non-image, non-audio, non-video file?"
+        ),
+        "criteria": {
+            "true": (
+                "The request requires reading, extracting, analyzing, "
+                "summarizing, comparing, or transforming a newly "
+                "provided PDF, Word document, spreadsheet, text file, "
+                "CSV, ZIP archive, or another supported non-media file. "
+                "Determine this from the request and available file "
+                "metadata. The mere presence of a file is insufficient."
+            ),
+            "false": (
+                "No newly provided non-media file requires processing, "
+                "or the request can be fulfilled without processing "
+                "the newly provided file. Also choose false when the "
+                "required content has already been processed and is "
+                "available in stored context."
+            ),
+        },
+    },
+    "image_analysis": {
+        "type": "choice",
+        "instructions": (
+            "Does the current request require analysis of a newly "
+            "provided image?"
+        ),
+        "criteria": {
+            "true": (
+                "The request requires understanding, interpreting, "
+                "describing, comparing, or extracting information "
+                "from a newly provided image. Determine this from "
+                "the request and available image metadata."
+            ),
+            "false": (
+                "No newly provided image requires analysis, the "
+                "required information has already been processed "
+                "and stored, or the image is only an input to a "
+                "generation or editing task that does not require "
+                "separate analysis."
+            ),
+        },
+    },
+    "audio_processing": {
+        "type": "choice",
+        "instructions": (
+            "Does the current request require processing newly "
+            "provided audio?"
+        ),
+        "criteria": {
+            "true": (
+                "The request requires transcribing, analyzing, "
+                "summarizing, extracting information from, or "
+                "converting newly provided audio. Determine this "
+                "from the request and available audio metadata."
+            ),
+            "false": (
+                "No newly provided audio requires processing, the "
+                "required information has already been processed "
+                "and stored, or the request is to generate or modify "
+                "audio rather than process existing audio."
+            ),
+        },
+    },
+    "video_processing": {
+        "type": "choice",
+        "instructions": (
+            "Does the current request require processing a newly "
+            "provided video?"
+        ),
+        "criteria": {
+            "true": (
+                "The request requires analyzing, summarizing, "
+                "transcribing, extracting information from, or "
+                "converting a newly provided video. Determine this "
+                "from the request and available video metadata."
+            ),
+            "false": (
+                "No newly provided video requires processing, the "
+                "required information has already been processed "
+                "and stored, or the request is to generate or modify "
+                "video rather than process existing video."
             ),
         },
     },
@@ -63,14 +207,13 @@ class PromptScanRequest(SelectRequest):
 
 
 class Decision(BaseModel):
-    choice: str
+    choice: str  # booleans come back as "true"/"false"
     confidence: float | None = None
     probabilities: dict[str, float]
 
 
 class PromptScanResponse(BaseModel):
-    model_routing: Decision
-    context_routing: Decision
+    decisions: dict[str, Decision]  # keyed by question name
     cached: bool  # served from the in-process cache, no OpenRouter call
     latency_ms: int
 
@@ -78,8 +221,9 @@ class PromptScanResponse(BaseModel):
 def _decision(name: str, answer) -> Decision:
     if not isinstance(answer, dict) or not isinstance(answer.get("probabilities"), dict):
         raise HTTPException(status_code=502, detail=f"Missing/invalid answer for {name}: {answer}")
-    probs = {k: round(float(v), 4) for k, v in answer["probabilities"].items()}
-    choice = answer.get("choice") or max(probs, key=probs.get)
+    probs = {str(k).lower(): round(float(v), 4) for k, v in answer["probabilities"].items()}
+    choice = answer.get("choice")
+    choice = str(choice).lower() if choice is not None else max(probs, key=probs.get)
     conf = answer.get("confidence")
     return Decision(
         choice=choice,
@@ -106,8 +250,7 @@ async def jev_prompt_scan_open_router(req: PromptScanRequest) -> PromptScanRespo
     if not isinstance(answers, dict):
         raise HTTPException(status_code=502, detail=f"Unrecognised OpenRouter response: {json.dumps(body)}")
     return PromptScanResponse(
-        model_routing=_decision("model_routing", answers.get("model_routing")),
-        context_routing=_decision("context_routing", answers.get("context_routing")),
+        decisions={name: _decision(name, answers.get(name)) for name in questions},
         cached=cached,
         latency_ms=round((time.perf_counter() - start) * 1000),
     )

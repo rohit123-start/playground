@@ -71,7 +71,7 @@
     <a href="/playground/model-picker">Model picker (JEV)</a>
   </nav>
   <h1>Prompt Scan Playground</h1>
-  <p class="sub">Sends a prompt to <code>POST /jev-prompt-scan-open-router</code> (typesafe/jev via OpenRouter). Two independent decisions: model/tool routing and context routing.</p>
+  <p class="sub">Sends a prompt to <code>POST /jev-prompt-scan-open-router</code> (typesafe/jev via OpenRouter). Eight independent decisions: model routing, history/memory/file context, and new file/image/audio/video processing.</p>
 
   <div class="card">
     <label for="q">Prompt</label>
@@ -92,7 +92,7 @@
   <div class="card" id="history-card" hidden>
     <label>History</label>
     <table>
-      <thead><tr><th>Prompt</th><th>Model</th><th>Context</th><th>Latency</th></tr></thead>
+      <thead><tr><th>Prompt</th><th>Decisions</th><th>Latency</th></tr></thead>
       <tbody id="history"></tbody>
     </table>
   </div>
@@ -108,8 +108,14 @@
   // Relative URLs only parse when served over http(s); fall back to the local server if opened as a file.
   const BASE = location.protocol.startsWith("http") ? "" : "http://localhost:8000";
   const ROUTE = BASE + "/jev-prompt-scan-open-router";
-  const isValid = (b) => b.model_routing && b.context_routing;
-  // Renders the response; returns [model, context] labels for the history table.
+  const isValid = (b) => b.decisions && Object.keys(b.decisions).length > 0;
+  const TITLES = {
+    model_routing: "Model / tool routing", conversation_history: "Conversation history",
+    memory_context: "Memory context", previous_files_context: "Previous files context",
+    file_processing: "File processing", image_analysis: "Image analysis",
+    audio_processing: "Audio processing", video_processing: "Video processing",
+  };
+  // Renders the response; returns a one-line summary for the history table.
   function decisionBlock(title, d) {
     const wrap = el("div", {}, el("h2", {}, title),
       el("div", { className: "intent" }, d.choice),
@@ -118,9 +124,9 @@
     return wrap;
   }
   function show(out, body) {
-    out.append(decisionBlock("Model / tool routing", body.model_routing),
-               decisionBlock("Context routing", body.context_routing));
-    return [body.model_routing.choice, body.context_routing.choice];
+    const entries = Object.entries(body.decisions);
+    for (const [name, d] of entries) out.append(decisionBlock(TITLES[name] || name, d));
+    return entries.map(([name, d]) => name + "=" + d.choice).join(", ");
   }
   const $ = (id) => document.getElementById(id);
   const q = $("q"), send = $("send");
@@ -173,13 +179,13 @@
     let label;
     if (!ok) {
       out.append(el("div", { className: "err" }, errorText(body, errText)));
-      label = ["error", ""];
+      label = "error";
     } else {
       label = show(out, body);
     }
     $("raw").textContent = body ? JSON.stringify(body, null, 2) : (errText || "");
     $("history-card").hidden = false;
-    $("history").prepend(el("tr", {}, el("td", {}, text), el("td", {}, label[0]), el("td", {}, label[1]),
+    $("history").prepend(el("tr", {}, el("td", {}, text), el("td", {}, label),
                                       el("td", { className: "num" }, ms + " ms")));
     send.disabled = false; send.textContent = "Send";
   }
@@ -188,10 +194,10 @@
   q.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") run(); });
 
   const EXAMPLES = {
-    "default + no context": ["Explain what a mutex is", "Write a haiku about autumn"],
-    "default + context": ["Summarize what we discussed earlier", "Fix the bug in the code I pasted above"],
-    "specific + no context": ["Search the web for today's top tech news", "Generate an image of a red fox in snow"],
-    "specific + context": ["Run the attached CSV through a Python script and plot it", "Transcribe the audio file I uploaded"],
+    "default": ["Explain what a mutex is", "Write a haiku about autumn"],
+    "specific model/tool": ["Search the web for today's top tech news", "Generate an image of a red fox in snow"],
+    "history / memory": ["Summarize what we discussed earlier", "Use my saved preferences to draft a reply"],
+    "files / media": ["Summarize the attached PDF", "Describe the attached image", "Transcribe the attached audio", "Summarize the attached video"],
   };
   $("examples-card").hidden = false;
   const showGroup = (name) => {
