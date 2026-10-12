@@ -26,29 +26,25 @@ questions = {
     "model_routing": {
         "type": "choice",
         "instructions": (
-            "Can the default LLM fulfill the user's entire request, "
-            "or does the request require an additional specialized "
-            "model or tool?"
+            "Does this request require a specialized model or tool "
+            "beyond the capabilities of the default model?"
         ),
         "criteria": {
             "default_model": (
-                "Choose when the default LLM can fulfill the request "
-                "adequately. Selecting file_processing, image_analysis, "
-                "audio_processing, or video_processing alone does not "
-                "require specific_model_or_tool. These dedicated "
-                "processing requirements are handled independently. "
-                "Choose default_model when no additional specialized "
-                "model or tool is required."
+                "The default model can fulfill the request without "
+                "an additional specialized model or tool. Dedicated "
+                "file, image, audio, and video processing requirements "
+                "are classified separately and do not automatically "
+                "require specific_model_or_tool."
             ),
             "specific_model_or_tool": (
-                "Choose when the request requires an additional "
-                "specialized model or tool beyond any applicable "
-                "dedicated file or media processing. Examples include "
-                "web search, image generation, video generation, "
-                "code execution, advanced coding, or complex reasoning "
-                "that the default LLM cannot adequately handle. "
-                "Evaluate the actual requirements, not merely the "
-                "topic, file type, or task length."
+                "The request requires an additional specialized model "
+                "or tool beyond the default model, such as web search, "
+                "image generation, video generation, or code execution. "
+                "Do not select this merely because a file or media "
+                "processing category is true. Analyzing, summarizing, "
+                "or transcribing an existing image, audio, or video is "
+                "not image or video generation and stays default_model."
             ),
         },
     },
@@ -56,22 +52,22 @@ questions = {
     "conversation_history": {
         "type": "choice",
         "instructions": (
-            "Does the request require information from earlier "
-            "messages in this conversation?"
+            "Does fulfilling the request require retrieving earlier "
+            "messages or responses from this conversation?"
         ),
         "criteria": {
             "true": (
-                "Choose only when answering requires earlier user "
-                "messages, assistant responses, decisions, or "
-                "discussion details. Examples include 'What did we "
-                "discuss earlier?' and 'Continue the plan we made.'"
+                "The request depends on earlier conversation messages, "
+                "assistant responses, decisions, explanations, or other "
+                "discussion details that are not sufficiently included "
+                "in the current request."
             ),
             "false": (
-                "Choose when the request can be answered without "
-                "retrieving earlier conversation messages. A reference "
-                "to a previous file alone does not automatically "
-                "require conversation history if the file can be "
-                "identified through previous_files_context."
+                "The request can be fulfilled without retrieving earlier "
+                "conversation messages or responses. A reference to a "
+                "previously provided file alone does not require "
+                "conversation history if the relevant file can be "
+                "identified through previous-file metadata."
             ),
         },
     },
@@ -79,21 +75,21 @@ questions = {
     "memory_context": {
         "type": "choice",
         "instructions": (
-            "Does the request require information from persistent "
-            "saved user memory?"
+            "Does fulfilling the request require persistent user "
+            "memory saved from previous conversations?"
         ),
         "criteria": {
             "true": (
-                "Choose only when saved preferences, personal settings, "
-                "or previously stored user details are needed. Examples "
-                "include 'Use my saved preferences' or 'What pricing "
-                "model did I previously decide on?' when that decision "
-                "is stored in memory."
+                "The request depends on a saved user preference, "
+                "personal detail, recurring constraint, or other "
+                "persistent memory that is not sufficiently available "
+                "in the current request or conversation."
             ),
             "false": (
-                "Choose when persistent user memory is not needed. "
-                "Do not select this merely because the request refers "
-                "to earlier conversation messages or uploaded files."
+                "The request can be fulfilled without retrieving "
+                "persistent user memory. Do not select true merely "
+                "because earlier conversation messages or files "
+                "may be relevant."
             ),
         },
     },
@@ -101,29 +97,21 @@ questions = {
     "previous_files_context": {
         "type": "choice",
         "instructions": (
-            "Does the request require information from a file uploaded "
-            "or processed before the current message?"
-        ),
-        "available_previous_files": (
-            "Dynamically supplied file metadata from the database "
-            "for the current user. Use the available metadata to "
-            "identify files relevant to the request."
+            "Does the request require a file from an earlier interaction?"
         ),
         "criteria": {
             "true": (
-                "Choose when the request requires a previously uploaded "
-                "or processed file. Match the request against available "
-                "file metadata, including file ID, filename, file type, "
-                "description, extracted content summary, and processing "
-                "status. For example, 'Summarize the contract I uploaded "
-                "yesterday' requires this context when the matching "
-                "contract is available."
+                "The request requires information from a previously "
+                "provided file that is not included among the current "
+                "request's attachments. The available previous-file "
+                "metadata must identify a relevant file."
             ),
             "false": (
-                "Choose when no previously uploaded or processed file "
-                "is required. Do not select this merely because a file "
-                "exists in the database. Newly attached files belong "
-                "to current-message input processing."
+                "The request can be fulfilled using only the current "
+                "request and its attachments, or no previous file is "
+                "required. Never select true solely because previous-file "
+                "metadata is available or because a current attachment "
+                "exists."
             ),
         },
     },
@@ -136,21 +124,18 @@ questions = {
         ),
         "criteria": {
             "true": (
-                "Choose when the request requires reading, extracting, "
-                "analyzing, summarizing, comparing, or transforming a "
-                "newly provided PDF, document, spreadsheet, CSV, text "
-                "file, ZIP archive, or another supported non-media file. "
-                "Use the request and available file metadata to identify "
-                "the required operation. The presence of a file alone "
-                "is insufficient."
+                "The current request includes a new non-media file "
+                "whose contents must be read, extracted, analyzed, "
+                "summarized, converted, compared, or otherwise processed. "
+                "Select true even when the request also requires "
+                "retrieving an earlier file."
             ),
             "false": (
-                "Choose when no newly provided non-media file needs "
-                "processing, or when the request can be fulfilled "
-                "without processing the file. Previously processed "
-                "content available in stored context does not require "
-                "processing the original file again unless the request "
-                "requires a new operation on that file."
+                "No newly provided non-media file requires processing. "
+                "Do not select true merely because a file is mentioned "
+                "or attached without a need to process its contents. "
+                "Do not use this category for image, audio, or "
+                "video processing."
             ),
         },
     },
@@ -158,19 +143,20 @@ questions = {
     "image_analysis": {
         "type": "choice",
         "instructions": (
-            "Does the request require analyzing a newly provided image?"
+            "Does the request require analyzing an existing image "
+            "provided with the current request?"
         ),
         "criteria": {
             "true": (
-                "Choose when the request requires understanding, "
-                "describing, interpreting, comparing, or extracting "
-                "information from a newly provided image."
+                "The request requires describing, interpreting, "
+                "extracting text from, comparing, or otherwise "
+                "analyzing a newly provided existing image."
             ),
             "false": (
-                "Choose when no newly provided image requires analysis, "
-                "or the image is only an input to an image generation "
-                "or editing operation that does not require separate "
-                "analysis."
+                "No newly provided image requires analysis. Choose "
+                "false when an image is only a reference or input "
+                "for image generation or editing, unless the request "
+                "also explicitly requires analyzing that image."
             ),
         },
     },
@@ -178,18 +164,22 @@ questions = {
     "audio_processing": {
         "type": "choice",
         "instructions": (
-            "Does the request require processing newly provided audio?"
+            "Does the request require processing a newly provided "
+            "audio input independently of any video?"
         ),
         "criteria": {
             "true": (
-                "Choose when the request requires transcribing, "
-                "analyzing, summarizing, or extracting information "
-                "from newly provided audio."
+                "The request requires transcribing, analyzing, "
+                "summarizing, translating, or extracting information "
+                "from a separately provided audio input, or explicitly "
+                "requests an audio-specific operation."
             ),
             "false": (
-                "Choose when no newly provided audio requires processing, "
-                "or the request is to generate or modify audio rather "
-                "than process existing audio."
+                "No separate audio-processing operation is required. "
+                "When audio is part of a video being processed, assign "
+                "the overall video-processing requirement to "
+                "video_processing. Do not select audio_processing "
+                "merely because a video contains speech or sound."
             ),
         },
     },
@@ -197,19 +187,22 @@ questions = {
     "video_processing": {
         "type": "choice",
         "instructions": (
-            "Does the request require processing a newly provided video?"
+            "Does the request require processing a newly provided "
+            "existing video?"
         ),
         "criteria": {
             "true": (
-                "Choose when the request requires analyzing, summarizing, "
-                "transcribing, or extracting information from a newly "
-                "provided video. Select this for the video as a whole, "
-                "including its visual content and relevant audio."
+                "The request requires summarizing, analyzing, "
+                "describing, transcribing, or extracting information "
+                "from a newly provided video. This category covers "
+                "the video as a whole, including relevant visual "
+                "content, dialogue, speech, and audio when needed."
             ),
             "false": (
-                "Choose when no newly provided video requires processing, "
-                "or the request is to generate or modify video rather "
-                "than process existing video."
+                "No newly provided existing video requires processing. "
+                "Choose false when the request is only to generate "
+                "or modify a video rather than process an existing one, "
+                "unless an existing video must also be analyzed."
             ),
         },
     },
