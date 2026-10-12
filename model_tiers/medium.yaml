@@ -37,10 +37,13 @@ choices:
         Math: proofs, equations, derivations, or calculations; also abstract
         reasoning and logic puzzles.
       none: >-
-        The request only asks to generate or edit an image, video, or audio, and
-        that output is the whole reply. Requests to summarize, transcribe, analyze,
-        or answer questions about a provided file, image, audio, or video do not
-        count.
+        Requests where another model's output is the whole reply: generating or
+        editing an image, video, or audio; or a question answered entirely by
+        looking things up online, such as news, recent events, prices, or facts that
+        may have changed. Requests to make something from web results, such as a
+        PDF, report, or code, do not count, and neither do requests to summarize,
+        transcribe, analyze, or answer questions about a provided file, image,
+        audio, or video.
 
   search_model:
     type: choice
@@ -52,6 +55,9 @@ choices:
       perplexity-sonar-reasoning-pro: >-
         Questions about recent events, news, prices, or facts that may have changed,
         including ones that need reasoning and an analytical answer with citations.
+      grok-4.7: >-
+        What people are saying on X or social media right now: trending topics,
+        viral posts, hashtags, or public reactions to an event.
 
   image_model:
     type: choice

@@ -26,10 +26,13 @@ choices:
         long-horizon coding across a large repository, or it involves a very long
         document.
       none: >-
-        The request only asks to generate or edit an image, video, or audio, and
-        that output is the whole reply. Requests to summarize, transcribe, analyze,
-        or answer questions about a provided file, image, audio, or video do not
-        count.
+        Requests where another model's output is the whole reply: generating or
+        editing an image, video, or audio; or a question answered entirely by
+        looking things up online, such as news, recent events, prices, or facts that
+        may have changed. Requests to make something from web results, such as a
+        PDF, report, or code, do not count, and neither do requests to summarize,
+        transcribe, analyze, or answer questions about a provided file, image,
+        audio, or video.
 
   search_model:
     type: choice
@@ -47,6 +50,9 @@ choices:
       perplexity-sonar-deep-research: >-
         The user wants an exhaustive research report or a thorough investigation of
         a topic and is willing to wait for it.
+      grok-4.7: >-
+        What people are saying on X or social media right now: trending topics,
+        viral posts, hashtags, or public reactions to an event.
 
   image_model:
     type: choice

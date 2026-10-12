@@ -8,7 +8,7 @@
       "glm-5.3-flash": "Most requests: general questions, explanations, and everyday coding; building web pages, landing pages, UI components, or dashboards; and multi-step tasks that use tools, browse a website, call an API, or work through a document step by step.",
       "gemini-3.8-flash": "Analysis, including finance or legal analysis, multi-step science or engineering reasoning, and system design and architecture questions such as scalability, concurrency, race conditions, or deadlocks.",
       "deepseek-v4.1-flash": "Math: equations, proofs, derivations, or calculations; coding tasks, including pure coding with no explanation or conversation needed; and finding information inside a very long text.",
-      "none": "The request only asks to generate or edit an image, video, or audio, and that output is the whole reply. Requests to summarize, transcribe, analyze, or answer questions about a provided file, image, audio, or video do not count."
+      "none": "Requests where another model's output is the whole reply: generating or editing an image, video, or audio; or a question answered entirely by looking things up online, such as news, recent events, prices, or facts that may have changed. Requests to make something from web results, such as a PDF, report, or code, do not count, and neither do requests to summarize, transcribe, analyze, or answer questions about a provided file, image, audio, or video."
     }
   },
   "search_model": {
@@ -16,8 +16,8 @@
     "instructions": "Which model should search the web for this request, if any?",
     "criteria": {
       "none": "Anything that can be answered or made without looking things up online, including requests to create or edit an image, video, or audio.",
-      "perplexity-sonar": "Questions about recent events, news, prices, or facts that may have changed, needing a short answer with citations.",
-      "perplexity-search": "The user explicitly asks for links, sources, or a list of web pages about a topic."
+      "perplexity-sonar": "Questions about recent events, news, prices, or facts that may have changed, answered with citations; also requests for links or sources on a topic.",
+      "grok-4.7": "What people are saying on X or social media right now: trending topics, viral posts, hashtags, or public reactions to an event."
     }
   },
   "image_model": {
