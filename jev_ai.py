@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 
 import openrouter
+from question_store import QuestionStore
 from schemas import SelectedTool, SelectRequest, SelectResponse
 
 load_dotenv()
@@ -21,8 +22,8 @@ OPENROUTER_API_KEY = os.getenv("OPEN_ROUTER_API_KEY")
 OPENROUTER_MODEL = os.getenv("JEV_OPEN_ROUTER_AI_MODEL")  # OpenRouter model id
 
 # Native noul/choice questions for the OpenRouter Decisions API.
-_QUESTIONS_FILE = Path(__file__).with_name("questions_jev_open_router_tool.json")
-questions = json.loads(_QUESTIONS_FILE.read_text(encoding="utf-8")) if _QUESTIONS_FILE.exists() else {}
+# Re-read when the file changes, so edits made in the playground apply without a restart.
+question_store = QuestionStore(Path(__file__).with_name("questions_jev_open_router_tool.json"))
 
 
 def _probability(answer) -> float | None:
@@ -47,6 +48,7 @@ async def jev_open_router_tool(req: SelectRequest) -> SelectResponse:
             status_code=500,
             detail="Set JEV_OPEN_ROUTER_AI_MODEL and OPEN_ROUTER_API_KEY environment variables",
         )
+    questions = question_store.get()
     body, _ = await openrouter.post_decision(
         OPENROUTER_DECISIONS_URL,
         OPENROUTER_API_KEY,

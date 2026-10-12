@@ -1,0 +1,66 @@
+{
+  "model_routing": {
+    "type": "choice",
+    "instructions": "Does this request require a specialized model or tool beyond the capabilities of the default model?",
+    "criteria": {
+      "default_model": "The default model can fulfill the request without an additional specialized model or tool. Dedicated file, image, audio, and video processing requirements are classified separately and do not automatically require specific_model_or_tool.",
+      "specific_model_or_tool": "The request requires an additional specialized model or tool beyond the default model, such as web search, image generation, video generation, or code execution. Do not select this merely because a file or media processing category is true. Analyzing, summarizing, or transcribing an existing image, audio, or video is not image or video generation and stays default_model."
+    }
+  },
+  "conversation_history": {
+    "type": "choice",
+    "instructions": "Does fulfilling the request require retrieving earlier messages or responses from this conversation?",
+    "criteria": {
+      "true": "The request depends on earlier conversation messages, assistant responses, decisions, explanations, or other discussion details that are not sufficiently included in the current request.",
+      "false": "The request can be fulfilled without retrieving earlier conversation messages or responses. A reference to a previously provided file alone does not require conversation history if the relevant file can be identified through previous-file metadata."
+    }
+  },
+  "memory_context": {
+    "type": "choice",
+    "instructions": "Does fulfilling the request require persistent user memory saved from previous conversations?",
+    "criteria": {
+      "true": "The request depends on a saved user preference, personal detail, recurring constraint, or other persistent memory that is not sufficiently available in the current request or conversation.",
+      "false": "The request can be fulfilled without retrieving persistent user memory. Do not select true merely because earlier conversation messages or files may be relevant."
+    }
+  },
+  "previous_files_context": {
+    "type": "choice",
+    "instructions": "Does the request require a file from an earlier interaction?",
+    "criteria": {
+      "true": "The request requires information from a previously provided file that is not included among the current request's attachments. The available previous-file metadata must identify a relevant file.",
+      "false": "The request can be fulfilled using only the current request and its attachments, or no previous file is required. Never select true solely because previous-file metadata is available or because a current attachment exists."
+    }
+  },
+  "file_processing": {
+    "type": "choice",
+    "instructions": "Does the request require processing a newly provided non-image, non-audio, non-video file?",
+    "criteria": {
+      "true": "The current request includes a new non-media file whose contents must be read, extracted, analyzed, summarized, converted, compared, or otherwise processed. Select true even when the request also requires retrieving an earlier file.",
+      "false": "No newly provided non-media file requires processing. Do not select true merely because a file is mentioned or attached without a need to process its contents. Do not use this category for image, audio, or video processing."
+    }
+  },
+  "image_analysis": {
+    "type": "choice",
+    "instructions": "Does the request require analyzing an existing image provided with the current request?",
+    "criteria": {
+      "true": "The request requires describing, interpreting, extracting text from, comparing, or otherwise analyzing a newly provided existing image.",
+      "false": "No newly provided image requires analysis. Choose false when an image is only a reference or input for image generation or editing, unless the request also explicitly requires analyzing that image."
+    }
+  },
+  "audio_processing": {
+    "type": "choice",
+    "instructions": "Does the request require processing a newly provided audio input independently of any video?",
+    "criteria": {
+      "true": "The request requires transcribing, analyzing, summarizing, translating, or extracting information from a separately provided audio input, or explicitly requests an audio-specific operation.",
+      "false": "No separate audio-processing operation is required. When audio is part of a video being processed, assign the overall video-processing requirement to video_processing. Do not select audio_processing merely because a video contains speech or sound."
+    }
+  },
+  "video_processing": {
+    "type": "choice",
+    "instructions": "Does the request require processing a newly provided existing video?",
+    "criteria": {
+      "true": "The request requires summarizing, analyzing, describing, transcribing, or extracting information from a newly provided video. This category covers the video as a whole, including relevant visual content, dialogue, speech, and audio when needed.",
+      "false": "No newly provided existing video requires processing. Choose false when the request is only to generate or modify a video rather than process an existing one, unless an existing video must also be analyzed."
+    }
+  }
+}

@@ -26,6 +26,7 @@
   textarea { width: 100%; min-height: 84px; resize: vertical; padding: 10px 12px; font: inherit;
              color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
   textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  [hidden] { display: none !important; }
   .row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
   button.primary { background: var(--accent); color: var(--accent-text); border: 0; border-radius: 8px;
                    padding: 9px 18px; font: inherit; font-weight: 600; cursor: pointer; }
@@ -97,6 +98,19 @@
     </table>
   </div>
 
+  <div class="card">
+    <div class="row" style="margin-top:0;justify-content:space-between">
+      <label style="margin:0">Questions JSON <code>questions_jev_prompt_scan.json</code></label>
+      <span><span class="hint" id="qjson-status"></span> <button class="tab" id="qedit" type="button">Edit</button></span>
+    </div>
+    <textarea id="qjson" spellcheck="false" readonly style="margin-top:8px;min-height:160px;overflow:hidden;resize:none;font:13px/1.45 ui-monospace, Consolas, monospace"></textarea>
+    <div class="row" id="qactions" hidden>
+      <button class="primary" id="qsave" disabled>Save</button>
+      <button class="tab" id="qrevert" type="button">Cancel</button>
+      <span class="hint">Ctrl/Cmd + S to save. Applies to the next Send, no restart.</span>
+    </div>
+  </div>
+
   <div class="card" id="examples-card" hidden>
     <label>Example prompts</label>
     <div class="tabs" id="tabs"></div>
@@ -129,6 +143,7 @@
     return entries.map(([name, d]) => name + "=" + d.choice).join(", ");
   }
   const $ = (id) => document.getElementById(id);
+
   const q = $("q"), send = $("send");
 
   function el(tag, props = {}, ...kids) {
@@ -210,6 +225,56 @@
     b.dataset.name = name;
     $("tabs").append(b);
   }
+  // ---- Questions JSON editor: loads the file, validates JSON as you type, Save writes it and the
+  // server applies it to the next request (no restart).
+  const qjson = $("qjson"), qsave = $("qsave"), qrevert = $("qrevert"), qstatus = $("qjson-status");
+  const qedit = $("qedit"), qactions = $("qactions");
+  let qLoaded = "", qUrl = null;
+  const qDirty = () => qjson.value !== qLoaded;
+  // The JSON is read-only until Edit is clicked; Save or Cancel returns to read-only.
+  function qSetEditing(on) {
+    qjson.readOnly = !on; qactions.hidden = !on; qedit.hidden = on;
+    if (on) qjson.focus();
+  }
+  // Grow the box to fit its text so the mouse wheel scrolls the page, not an inner scrollbar.
+  const qFit = () => { qjson.style.height = "auto"; qjson.style.height = (qjson.scrollHeight + qjson.offsetHeight - qjson.clientHeight) + "px"; };
+  function qState(msg, bad) {
+    let valid = true;
+    try { JSON.parse(qjson.value); } catch (e) { valid = false; if (!msg) { msg = "Invalid JSON: " + e.message; bad = true; } }
+    if (!msg) msg = qDirty() ? "Unsaved changes" : "Saved";
+    qstatus.textContent = msg; qstatus.style.color = bad ? "var(--bad)" : "";
+    qsave.disabled = !qDirty() || !valid;
+  }
+  async function loadQuestions(url) {
+    qSetEditing(false); qUrl = url; qstatus.textContent = "Loading…";
+    try {
+      const r = await fetch(BASE + url, { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status + " " + r.statusText);
+      qjson.value = qLoaded = JSON.stringify(await r.json(), null, 2);
+      qFit(); qState();
+    } catch (e) { qState("Could not load: " + e, true); }
+  }
+  async function saveQuestions() {
+    let data;
+    try { data = JSON.parse(qjson.value); } catch { return qState(); }
+    qsave.disabled = true; qstatus.textContent = "Saving…";
+    try {
+      const r = await fetch(BASE + qUrl, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      const b = await r.json().catch(() => null);
+      if (!r.ok) {
+        const d = b && b.detail;
+        return qState("Not saved: " + (d ? (typeof d === "string" ? d : JSON.stringify(d)) : r.statusText), true);
+      }
+      qjson.value = qLoaded = JSON.stringify(b, null, 2);
+      qFit(); qSetEditing(false); qState("Saved " + new Date().toLocaleTimeString());
+    } catch (e) { qState("Not saved: " + e, true); }
+  }
+  qjson.addEventListener("input", () => { qFit(); qState(); });
+  qjson.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); if (!qsave.disabled) saveQuestions(); } });
+  qsave.addEventListener("click", saveQuestions);
+  qedit.addEventListener("click", () => qSetEditing(true));
+  qrevert.addEventListener("click", () => { qjson.value = qLoaded; qFit(); qSetEditing(false); qState(); });
+  loadQuestions("/playground/prompt-scan/questions");
   showGroup(Object.keys(EXAMPLES)[0]);
 </script>
 </body>

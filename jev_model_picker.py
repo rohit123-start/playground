@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 import openrouter
+from question_store import QuestionStore
 from jev_prompt_scan import Decision, PromptScanRequest, _decision
 
 load_dotenv()
@@ -27,10 +28,9 @@ BASE_DIR = Path(__file__).parent
 TIERS = ("low", "medium", "high")
 
 # Built from model_tiers/<tier>.yaml by build_model_picker_questions.py.
-questions: dict[str, dict] = {
-    tier: json.loads(
-        (BASE_DIR / f"questions_jev_model_picker_{tier}.json").read_text(encoding="utf-8")
-    )
+# Each file is re-read when it changes, so edits made in the playground apply without a restart.
+question_stores: dict[str, QuestionStore] = {
+    tier: QuestionStore(BASE_DIR / f"questions_jev_model_picker_{tier}.json", require_none=True)
     for tier in TIERS
 }
 
@@ -53,14 +53,15 @@ def _make_handler(tier: str):
         state = {"user_request": req.user_query}
         if req.metadata:
             state["metadata"] = req.metadata
+        tier_questions = question_stores[tier].get()
         start = time.perf_counter()
         body, cached = await openrouter.post_decision(
-            OPENROUTER_DECISIONS_URL, OPENROUTER_API_KEY, OPENROUTER_MODEL, state, questions[tier]
+            OPENROUTER_DECISIONS_URL, OPENROUTER_API_KEY, OPENROUTER_MODEL, state, tier_questions
         )
         answers = body.get("answers")
         if not isinstance(answers, dict):
             raise HTTPException(status_code=502, detail=f"Unrecognised OpenRouter response: {json.dumps(body)}")
-        decisions = {name: _decision(name, answers.get(name)) for name in questions[tier]}
+        decisions = {name: _decision(name, answers.get(name)) for name in tier_questions}
         return ModelPickResponse(
             tier=tier,
             selected={n: (None if d.choice == "none" else d.choice) for n, d in decisions.items()},
