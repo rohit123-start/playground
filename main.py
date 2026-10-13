@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 import jev_ai
 import jev_model_picker
 import jev_prompt_scan
+import jev_tool_model_routing
 
 BASE_DIR = Path(__file__).parent
 
@@ -22,6 +23,7 @@ app = FastAPI(title="Tool Selector")
 app.include_router(jev_ai.router)  # POST /jev-open-router-tool
 app.include_router(jev_prompt_scan.router)  # POST /jev-prompt-scan-open-router
 app.include_router(jev_model_picker.router)  # POST /jev-model-picker-{low,medium,high}
+app.include_router(jev_tool_model_routing.router)  # POST /jev-tool-model-routing
 
 
 @app.get("/playground", include_in_schema=False)
@@ -37,6 +39,11 @@ async def playground_prompt_scan():
 @app.get("/playground/model-picker", include_in_schema=False)
 async def playground_model_picker():
     return _page("playground_model_picker.html")
+
+
+@app.get("/playground/tool-model-routing", include_in_schema=False)
+async def playground_tool_model_routing():
+    return _page("playground_tool_model_routing.html")
 
 
 # Questions JSON shown and edited in the playground pages. PUT validates, saves, and applies
@@ -78,3 +85,14 @@ async def playground_model_picker_questions(tier: str, response: Response):
 @app.put("/playground/model-picker/questions/{tier}", include_in_schema=False)
 async def save_playground_model_picker_questions(tier: str, body: dict):
     return _picker_store(tier).put(body)
+
+
+@app.get("/playground/tool-model-routing/questions", include_in_schema=False)
+async def playground_tool_model_routing_questions(response: Response):
+    response.headers.update(NO_STORE)
+    return jev_tool_model_routing.question_store.get()
+
+
+@app.put("/playground/tool-model-routing/questions", include_in_schema=False)
+async def save_playground_tool_model_routing_questions(body: dict):
+    return jev_tool_model_routing.question_store.put(body)

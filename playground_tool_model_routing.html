@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tool Model Routing Playground</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --text: #1c1c1a; --muted: #6b6b66; --line: #e2e2dd;
+    --accent: #2f5fd0; --accent-text: #ffffff; --good: #1f7a45; --bad: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --card: #1e1e1c; --text: #ecece8; --muted: #9a9a93; --line: #34342f;
+      --accent: #6c93f0; --accent-text: #10131a; --good: #5fd08a; --bad: #f2877f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; font-weight: 600; margin-bottom: 8px; }
+  textarea { width: 100%; min-height: 84px; resize: vertical; padding: 10px 12px; font: inherit;
+             color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  [hidden] { display: none !important; }
+  .row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+  button.primary { background: var(--accent); color: var(--accent-text); border: 0; border-radius: 8px;
+                   padding: 9px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.primary:disabled { opacity: .6; cursor: default; }
+  .hint { color: var(--muted); font-size: 13px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+  .tab { border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 999px;
+         padding: 3px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+  .tab[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .meta { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+  .meta b { color: var(--text); }
+  .tool { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+  .tool:first-of-type { border-top: 0; }
+  .tool code { font-weight: 600; }
+  .bar { flex: 1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--good); }
+  .intent { font-size: 26px; font-weight: 700; margin: 0 0 4px; }
+  .intent.none { color: var(--muted); font-style: italic; }
+  .example { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+  .badge { display: inline-block; border-radius: 4px; padding: 1px 7px; font-size: 11px; font-weight: 700;
+           text-transform: uppercase; letter-spacing: .03em; margin-left: 8px; vertical-align: middle; }
+  .badge.noul { background: var(--good); color: var(--bg); }
+  .badge.choice { background: var(--accent); color: var(--accent-text); }
+  .none { color: var(--muted); font-style: italic; }
+  .err { color: var(--bad); white-space: pre-wrap; word-break: break-word; }
+  pre { margin: 0; padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+        overflow: auto; font-size: 13px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 16px 0 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-top: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; border-top: 0; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .nav { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+  .nav a { border: 1px solid var(--line); color: var(--text); border-radius: 999px; padding: 4px 14px;
+           font-size: 13px; text-decoration: none; }
+  .nav a[aria-current="page"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <nav class="nav">
+    <a href="/playground">Tool selection</a>
+    <a href="/playground/prompt-scan">Prompt scan (JEV)</a>
+    <a href="/playground/model-picker">Model picker (JEV)</a>
+    <a href="/playground/tool-model-routing" aria-current="page">Tool model routing (JEV)</a>
+  </nav>
+  <h1>Tool Model Routing Playground</h1>
+  <p class="sub">Sends a prompt to <code>POST /jev-tool-model-routing</code> (typesafe/jev via OpenRouter). For each capability (web search, research, image/video/audio generation, PDF/document/spreadsheet/presentation generation, artifact), JEV decides whether it's needed and which model should handle it.</p>
+
+  <div class="card">
+    <label for="q">Prompt</label>
+    <textarea id="q" placeholder="e.g. create an image of a sunset"></textarea>
+    <div class="row">
+      <button class="primary" id="send">Send</button>
+      <span class="hint">Ctrl/Cmd + Enter to send</span>
+    </div>
+  </div>
+
+  <div class="card" id="result" hidden>
+    <div class="meta" id="meta"></div>
+    <div id="tools"></div>
+    <h2>Raw response</h2>
+    <pre id="raw"></pre>
+  </div>
+
+  <div class="card" id="history-card" hidden>
+    <label>History</label>
+    <table>
+      <thead><tr><th>Prompt</th><th>Decisions</th><th>Latency</th></tr></thead>
+      <tbody id="history"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="row" style="margin-top:0;justify-content:space-between">
+      <label style="margin:0">Questions JSON <code>questions_jev_tool_model_routing.json</code></label>
+      <span><span class="hint" id="qjson-status"></span> <button class="tab" id="qedit" type="button">Edit</button></span>
+    </div>
+    <textarea id="qjson" spellcheck="false" readonly style="margin-top:8px;min-height:160px;overflow:hidden;resize:none;font:13px/1.45 ui-monospace, Consolas, monospace"></textarea>
+    <div class="row" id="qactions" hidden>
+      <button class="primary" id="qsave" disabled>Save</button>
+      <button class="tab" id="qrevert" type="button">Cancel</button>
+      <span class="hint">Ctrl/Cmd + S to save. Applies to the next Send, no restart.</span>
+    </div>
+  </div>
+</main>
+
+<script>
+  // Relative URLs only parse when served over http(s); fall back to the local server if opened as a file.
+  const BASE = location.protocol.startsWith("http") ? "" : "http://localhost:8000";
+  const ROUTE = BASE + "/jev-tool-model-routing";
+  const isValid = (b) => b.decisions && Object.keys(b.decisions).length > 0;
+  const TITLES = {
+    web_search: "Web search", web_search_model: "Web search model",
+    research: "Research", research_model: "Research model",
+    image_generation: "Image generation", image_generation_model: "Image generation model",
+    video_generation: "Video generation", video_generation_model: "Video generation model",
+    audio_generation: "Audio generation", audio_generation_model: "Audio generation model",
+    pdf_generation: "PDF generation", pdf_generation_model: "PDF generation model",
+    document_generation: "Document generation", document_generation_model: "Document generation model",
+    spreadsheet_generation: "Spreadsheet generation", spreadsheet_generation_model: "Spreadsheet generation model",
+    presentation_generation: "Presentation generation", presentation_generation_model: "Presentation generation model",
+    artifact: "Artifact", artifact_model: "Artifact model",
+    no_tool: "No tool", no_tool_model: "No tool model",
+  };
+
+  function el(tag, props = {}, ...kids) {
+    const n = Object.assign(document.createElement(tag), props);
+    n.append(...kids);
+    return n;
+  }
+
+  function scoreBar(name, score) {
+    const b = el("div", { className: "bar" }, el("i"));
+    b.firstChild.style.width = Math.round(Math.max(0, Math.min(1, score)) * 100) + "%";
+    return el("div", { className: "tool" }, el("code", {}, name), b, el("span", { className: "hint" }, score.toFixed(4)));
+  }
+
+  // Renders one capability's decision; returns nothing, mutates nothing, just builds the block.
+  function decisionBlock(title, d) {
+    const shown = d.choice === null ? (d.type === "noul" ? "false" : "null") : d.choice;
+    const badge = el("span", { className: "badge " + d.type }, d.type);
+    const wrap = el("div", {}, el("h2", {}, title, badge),
+      el("div", { className: "intent" + (d.choice === null ? " none" : "") }, shown),
+      el("div", { className: "example" }, "confidence " + (d.confidence ?? "n/a")));
+    for (const [name, p] of Object.entries(d.probabilities)) wrap.append(scoreBar(name, p));
+    return wrap;
+  }
+
+  function show(out, body) {
+    const entries = Object.entries(body.decisions);
+    for (const [name, d] of entries) out.append(decisionBlock(TITLES[name] || name, d));
+    return entries.filter(([, d]) => d.choice !== null).map(([name, d]) => name + "=" + d.choice).join(", ") || "no tool";
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const q = $("q"), send = $("send");
+
+  function errorText(body, errText) {
+    const d = body && body.detail;
+    return d ? (typeof d === "string" ? d : JSON.stringify(d)) : (errText || "Request failed");
+  }
+
+  async function run() {
+    const text = q.value.trim();
+    if (!text) { q.focus(); return; }
+    send.disabled = true; send.textContent = "Sending…";
+    const start = performance.now();
+    let status = 0, body = null, errText = null;
+    try {
+      const r = await fetch(ROUTE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_query: text }),
+      });
+      status = r.status;
+      const raw = await r.text();
+      try { body = JSON.parse(raw); } catch { errText = raw; }
+    } catch (e) {
+      errText = String(e);
+    }
+    const ms = Math.round(performance.now() - start);
+    $("result").hidden = false;
+    const ok = status === 200 && body && isValid(body);
+    const meta = [el("span", {}, "Status ", el("b", {}, status || "network error")),
+                  el("span", {}, "Round trip ", el("b", {}, ms + " ms"))];
+    if (ok && body.latency_ms !== undefined) meta.push(el("span", {}, "Server ", el("b", {}, body.latency_ms + " ms")));
+    if (ok && body.cached) meta.push(el("span", {}, "Cache ", el("b", {}, "hit")));
+    $("meta").replaceChildren(...meta);
+    const out = $("tools");
+    out.replaceChildren();
+    let label;
+    if (!ok) {
+      out.append(el("div", { className: "err" }, errorText(body, errText)));
+      label = "error";
+    } else {
+      label = show(out, body);
+    }
+    $("raw").textContent = body ? JSON.stringify(body, null, 2) : (errText || "");
+    $("history-card").hidden = false;
+    $("history").prepend(el("tr", {}, el("td", {}, text), el("td", {}, label),
+                                      el("td", { className: "num" }, ms + " ms")));
+    send.disabled = false; send.textContent = "Send";
+  }
+
+  send.addEventListener("click", run);
+  q.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") run(); });
+
+  // ---- Questions JSON editor: loads the file, validates JSON as you type, Save writes it and the
+  // server applies it to the next request (no restart).
+  const qjson = $("qjson"), qsave = $("qsave"), qrevert = $("qrevert"), qstatus = $("qjson-status");
+  const qedit = $("qedit"), qactions = $("qactions");
+  let qLoaded = "", qUrl = null;
+  const qDirty = () => qjson.value !== qLoaded;
+  // The JSON is read-only until Edit is clicked; Save or Cancel returns to read-only.
+  function qSetEditing(on) {
+    qjson.readOnly = !on; qactions.hidden = !on; qedit.hidden = on;
+    if (on) qjson.focus();
+  }
+  // Grow the box to fit its text so the mouse wheel scrolls the page, not an inner scrollbar.
+  const qFit = () => { qjson.style.height = "auto"; qjson.style.height = (qjson.scrollHeight + qjson.offsetHeight - qjson.clientHeight) + "px"; };
+  function qState(msg, bad) {
+    let valid = true;
+    try { JSON.parse(qjson.value); } catch (e) { valid = false; if (!msg) { msg = "Invalid JSON: " + e.message; bad = true; } }
+    if (!msg) msg = qDirty() ? "Unsaved changes" : "Saved";
+    qstatus.textContent = msg; qstatus.style.color = bad ? "var(--bad)" : "";
+    qsave.disabled = !qDirty() || !valid;
+  }
+  async function loadQuestions(url) {
+    qSetEditing(false); qUrl = url; qstatus.textContent = "Loading…";
+    try {
+      const r = await fetch(BASE + url, { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status + " " + r.statusText);
+      qjson.value = qLoaded = JSON.stringify(await r.json(), null, 2);
+      qFit(); qState();
+    } catch (e) { qState("Could not load: " + e, true); }
+  }
+  async function saveQuestions() {
+    let data;
+    try { data = JSON.parse(qjson.value); } catch { return qState(); }
+    qsave.disabled = true; qstatus.textContent = "Saving…";
+    try {
+      const r = await fetch(BASE + qUrl, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      const b = await r.json().catch(() => null);
+      if (!r.ok) {
+        const d = b && b.detail;
+        return qState("Not saved: " + (d ? (typeof d === "string" ? d : JSON.stringify(d)) : r.statusText), true);
+      }
+      qjson.value = qLoaded = JSON.stringify(b, null, 2);
+      qFit(); qSetEditing(false); qState("Saved " + new Date().toLocaleTimeString());
+    } catch (e) { qState("Not saved: " + e, true); }
+  }
+  qjson.addEventListener("input", () => { qFit(); qState(); });
+  qjson.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); if (!qsave.disabled) saveQuestions(); } });
+  qsave.addEventListener("click", saveQuestions);
+  qedit.addEventListener("click", () => qSetEditing(true));
+  qrevert.addEventListener("click", () => { qjson.value = qLoaded; qFit(); qSetEditing(false); qState(); });
+  loadQuestions("/playground/tool-model-routing/questions");
+</script>
+</body>
+</html>

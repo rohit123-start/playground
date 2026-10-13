@@ -1,0 +1,206 @@
+{
+  "web_search": {
+    "type": "noul",
+    "instructions": "Is web search required to fulfill this request?",
+    "criteria": {
+      "true": "The user explicitly asks to search, browse, look up, find online, or use web search, or the request requires current, recent, live, external, or internet-only information.",
+      "false": "The request can be fulfilled using available context, provided files, or existing knowledge without accessing the web."
+    }
+  },
+  "web_search_model": {
+    "type": "choice",
+    "instructions": "Web search is required. Which model should run the search for this request?",
+    "criteria": {
+      "perplexity-sonar": "General web lookups: recent events, news, prices, availability, current facts, or anything that may have changed, answered with citations. Also requests for links or sources on a topic.",
+      "grok-4.7": "The search is about what people are saying on X or social media right now: trending topics, viral posts, hashtags, or public reactions to an event.",
+      "gemini-3.8-flash": "The search needs analysis on top of current information, such as finance or legal questions, or multi-step science or engineering reasoning that depends on up-to-date facts.",
+      "gpt-6-luna": "The search is combined with a provided image, such as identifying something in a photo and finding where to buy it. Also searches where the result is turned into writing, such as an email, a short essay, or creative text.",
+      "claude-haiku-4-5": "A very simple lookup where the fastest possible reply matters most, or a search combined with a provided file such as a PDF, document, or spreadsheet."
+    }
+  },
+  "research": {
+    "type": "noul",
+    "instructions": "Is in-depth research required?",
+    "criteria": {
+      "true": "The user requests deep research, comprehensive investigation, systematic multi-source investigation, evidence-based analysis, or a detailed research report requiring substantial investigation. Research may require web search, but do not select research merely because the user asks a question about a topic or requests a quick online lookup.",
+      "false": "The request needs only a quick lookup, a straightforward answer, ordinary web searching, or no external research."
+    }
+  },
+  "research_model": {
+    "type": "choice",
+    "instructions": "In-depth research is required. Which model should carry out the research?",
+    "criteria": {
+      "perplexity-sonar": "General multi-source research on a topic, market, product, or event, gathered from many sources with citations.",
+      "gemini-3.8-flash": "Research that needs analysis or reasoning on top of the sources, such as finance, legal, science, or engineering topics.",
+      "grok-4.7": "Research into public opinion or discussion on X or social media, such as sentiment, reactions, or how a topic is trending over time.",
+      "gpt-6-luna": "Research that starts from a provided image, such as investigating a product, place, or object shown in a photo.",
+      "claude-haiku-4-5": "Research that starts from a provided file such as a PDF, document, or spreadsheet, such as checking or expanding its contents against online sources."
+    }
+  },
+  "image_generation": {
+    "type": "noul",
+    "instructions": "Is image generation required?",
+    "criteria": {
+      "true": "The user asks to create, generate, draw, make, edit, modify, or transform an image, picture, illustration, artwork, photo, or graphic.",
+      "false": "The request does not require creating or modifying an image. Analyzing an existing image is handled separately."
+    }
+  },
+  "image_generation_model": {
+    "type": "choice",
+    "instructions": "Image generation or editing is required. Which model should make or edit the image?",
+    "criteria": {
+      "grok-imagine-image-2.0": "General images and edits: everyday pictures, quick mockups, and social media graphics.",
+      "gemini-3.1-flash-lite-image": "Small quick edits to an existing image, and thumbnails.",
+      "qwen-image-3.0": "Images that must contain small readable text, formulas, or text in several languages, such as infographics or labeled diagrams.",
+      "flux-2-turbo": "Rough drafts or many variations while the user is still iterating, or images larger than standard size (up to 2048 pixels).",
+      "wan2.7-image": "Combining several reference images into one, or matching exact brand colors."
+    }
+  },
+  "video_generation": {
+    "type": "noul",
+    "instructions": "Is video generation required?",
+    "criteria": {
+      "true": "The user asks to create, generate, make, edit, modify, or transform a video.",
+      "false": "The request does not require creating or modifying a video. Analyzing an existing video is handled separately."
+    }
+  },
+  "video_generation_model": {
+    "type": "choice",
+    "instructions": "Video generation or editing is required. Which model should make or edit the video?",
+    "criteria": {
+      "gemini-omni-1.1-flash": "General video generation and edits; also extending an existing clip into a longer scene or adding a transition.",
+      "grok-imagine-video-1.5": "A new short social media clip, or turning a still image into a short video.",
+      "grok-imagine-video": "A quick edit to an existing short social clip.",
+      "veo-3.1-fast-generate-001": "A finished-quality 1080p clip with synchronized sound.",
+      "kling-v3.0-std": "A clip that must start and end on specific images the user provides.",
+      "seedance-2.0-mini": "Product videos for e-commerce, user-generated-content style clips, or many ad variants at once, including edits to such clips.",
+      "grok-imagine-video-1.5-lite": "A cheap rough preview or draft of an idea before making the real clip, including short drafts with spoken dialogue."
+    }
+  },
+  "audio_generation": {
+    "type": "noul",
+    "instructions": "Is audio generation required?",
+    "criteria": {
+      "true": "The user asks to create, generate, make, edit, modify, or transform speech, voice, music, or sound effects.",
+      "false": "The request does not require creating or modifying audio. Processing existing audio is handled separately."
+    }
+  },
+  "audio_generation_model": {
+    "type": "choice",
+    "instructions": "Audio generation or editing is required. Which model should make or edit the audio?",
+    "criteria": {
+      "gemini-3.8-flash-tts": "Longer or directed speech: narration, audiobooks, dialogue between two speakers, directed pace or emphasis, and less common languages. Also changes to existing spoken audio, made by regenerating the speech with the requested changes.",
+      "gemini-3.8-flash-lite-tts": "Reading a short text aloud, real-time voice replies, or many clips at once.",
+      "qwen-audio-3.0-tts-flash": "Low-resource languages, or speech where a specific emotion or tone is requested."
+    }
+  },
+  "pdf_generation": {
+    "type": "noul",
+    "instructions": "Is creating or converting content into a PDF required?",
+    "criteria": {
+      "true": "The user requests a PDF as an output, including creating a new PDF, exporting content to PDF, or converting an existing image, document, spreadsheet, or other content into a PDF. Select true even if another output format is also requested.",
+      "false": "The user only wants to read, summarize, analyze, extract information from, or answer questions about an existing PDF. Do not select PDF generation when the requested output is only a chat response, editable document, spreadsheet, or presentation."
+    }
+  },
+  "pdf_generation_model": {
+    "type": "choice",
+    "instructions": "A PDF must be created. Which model should write the script that builds it?",
+    "criteria": {
+      "glm-5.3-flash": "General PDFs with structure and layout: reports, guides, tables, and charts, including PDFs made from web search or research results.",
+      "deepseek-v4.1-flash": "PDFs heavy in math, formulas, calculations, or code.",
+      "gpt-6-luna": "PDFs that are mostly writing, such as letters, essays, or stories, or PDFs built from a provided image.",
+      "claude-haiku-4-5": "Short, simple PDFs where speed matters most, or converting a provided file into a PDF."
+    }
+  },
+  "document_generation": {
+    "type": "noul",
+    "instructions": "Is creating a new editable document required?",
+    "criteria": {
+      "true": "The user requests creating or delivering a new editable document, such as a Word document or DOCX file. This includes requesting a written report specifically as an editable document. Select true even if another output format is also requested.",
+      "false": "The user does not request a new editable document. Reading, summarizing, analyzing, or extracting information from an existing document does not count. PDF files belong to pdf_generation; Excel, XLSX, and CSV files belong to spreadsheet_generation; PowerPoint, PPTX, and slide decks belong to presentation_generation. Do not select document_generation merely because the user requests a report if the requested output format is another file type or a chat response."
+    }
+  },
+  "document_generation_model": {
+    "type": "choice",
+    "instructions": "An editable document must be created. Which model should write the script that builds it?",
+    "criteria": {
+      "glm-5.3-flash": "General structured documents: reports, plans, guides, and documents with headings and tables, including ones made from web search or research results.",
+      "gpt-6-luna": "Documents that are mostly writing, such as letters, essays, stories, or polished prose, or documents built from a provided image.",
+      "claude-haiku-4-5": "Short, simple documents where speed matters most, or rewriting or reformatting a provided file into a new document.",
+      "deepseek-v4.1-flash": "Technical documents heavy in math, formulas, calculations, or code."
+    }
+  },
+  "spreadsheet_generation": {
+    "type": "noul",
+    "instructions": "Is creating a spreadsheet file required?",
+    "criteria": {
+      "true": "The user requests creating or delivering a spreadsheet file, such as Excel, XLSX, or CSV. This includes creating a spreadsheet report from research, provided data, calculations, or other information. Select true even if another output format is also requested.",
+      "false": "The user does not request a spreadsheet file. Reading, summarizing, or analyzing an existing spreadsheet does not count. An ordinary table in a chat response, a PDF report, an editable Word document, or a presentation does not count as spreadsheet generation."
+    }
+  },
+  "spreadsheet_generation_model": {
+    "type": "choice",
+    "instructions": "A spreadsheet must be created. Which model should write the script that builds it?",
+    "criteria": {
+      "glm-5.3-flash": "General spreadsheets: lists, trackers, and tables of data, including ones made from web search or research results.",
+      "deepseek-v4.1-flash": "Spreadsheets built around formulas, calculations, or financial models.",
+      "claude-haiku-4-5": "Turning tables or data from a provided file into a spreadsheet, or small simple spreadsheets where speed matters most.",
+      "gpt-6-luna": "Spreadsheets built from data in a provided image, such as a photo of a receipt, table, or handwritten list."
+    }
+  },
+  "presentation_generation": {
+    "type": "noul",
+    "instructions": "Is creating a presentation or slide deck required?",
+    "criteria": {
+      "true": "The user requests creating or delivering a presentation, PowerPoint, PPTX, slide deck, slideshow, investor deck, or pitch deck. This includes creating slides from research or other provided information. Select true even if another output format is also requested.",
+      "false": "The user does not request a presentation or slide-based output. Reading, summarizing, or analyzing an existing presentation does not count. A report, PDF, spreadsheet, editable Word document, or ordinary collection of information is not presentation generation unless the user requests a presentation or slide deck."
+    }
+  },
+  "presentation_generation_model": {
+    "type": "choice",
+    "instructions": "A presentation must be created. Which model should write the script that builds it?",
+    "criteria": {
+      "glm-5.3-flash": "General decks with structured layouts, charts, and tables, including decks made from web search or research results.",
+      "gpt-6-luna": "Decks driven by writing and storytelling, such as a pitch narrative or a talk, or decks built from a provided image.",
+      "claude-haiku-4-5": "Turning a provided file into slides, or short simple decks where speed matters most.",
+      "deepseek-v4.1-flash": "Technical decks heavy in math, formulas, calculations, or code."
+    }
+  },
+  "artifact": {
+    "type": "noul",
+    "instructions": "Is a dedicated artifact-building capability required?",
+    "criteria": {
+      "true": "The user requests creating or modifying a website, web app, interactive UI, dashboard, interactive prototype, or another structured, interactive digital experience that requires the artifact-building capability.",
+      "false": "The request involves ordinary text or code, explanations, research, summarizing or analyzing existing files, converting files, generating PDFs, documents, spreadsheets, presentations, images, videos, or audio through dedicated capabilities. Do not select artifact merely because the requested output is structured, tabular, visual, or formatted. A static report, document, table, diagram, or file is not automatically an interactive artifact."
+    }
+  },
+  "artifact_model": {
+    "type": "choice",
+    "instructions": "An artifact must be built. Which model should write its code?",
+    "criteria": {
+      "glm-5.3-flash": "General web pages, landing pages, UI components, and dashboards.",
+      "deepseek-v4.1-flash": "Logic-heavy interactive apps, such as calculators, games, simulations, or tools that process data.",
+      "gpt-6-luna": "Building a page or UI from a provided image, such as a screenshot or sketch.",
+      "claude-haiku-4-5": "Small, simple widgets or quick changes to an existing artifact where speed matters most."
+    }
+  },
+  "no_tool": {
+    "type": "noul",
+    "instructions": "Are none of the capabilities in this routing list required?",
+    "criteria": {
+      "true": "The request can be fulfilled entirely through existing knowledge, reasoning, conversation context, or ordinary text generation without requiring any capability listed in this routing configuration. Image analysis, video processing, audio processing, and file processing are handled by separate routing steps and do not by themselves determine this value. Return true only when no capability in this list is required.",
+      "false": "At least one capability listed in this routing configuration is required to fulfill the request. If any other listed capability is required, no_tool must be false, even when multiple capabilities are needed or handled by different routing steps."
+    }
+  },
+  "no_tool_model": {
+    "type": "choice",
+    "instructions": "No tool is required. Which model should answer the request directly?",
+    "criteria": {
+      "gpt-6-luna": "General questions and explanations; writing tasks such as an email, a rewrite, or a short essay; creative writing such as stories, dialogue, roleplay, or characters; and classifying, extracting, tagging, or labeling information from text.",
+      "claude-haiku-4-5": "Very simple questions where the fastest possible reply matters most.",
+      "glm-5.3-flash": "Everyday coding with explanation.",
+      "gemini-3.8-flash": "Analysis, including finance or legal analysis; multi-step science or engineering reasoning; and system design or architecture questions such as scalability, concurrency, race conditions, or deadlocks.",
+      "deepseek-v4.1-flash": "Math: equations, proofs, derivations, or calculations; pure coding with no explanation or conversation needed; and finding information inside very long text pasted into the chat."
+    }
+  }
+}
