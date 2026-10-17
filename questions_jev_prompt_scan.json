@@ -1,66 +1,80 @@
 {
   "model_routing": {
     "type": "choice",
-    "instructions": "Does this request require a specialized model or tool beyond the capabilities of the default model?",
+    "instructions": "Can the default model answer this directly, or does it need specific routing?",
     "criteria": {
-      "default_model": "The default model can fulfill the request without an additional specialized model or tool. Dedicated file, image, audio, and video processing requirements are classified separately and do not automatically require specific_model_or_tool.",
-      "specific_model_or_tool": "The request requires an additional specialized model or tool beyond the default model, such as web search, image generation, video generation, or code execution. Do not select this merely because a file or media processing category is true. Analyzing, summarizing, or transcribing an existing image, audio, or video is not image or video generation and stays default_model."
+      "default_model": "The default model can answer directly: everyday chat, general questions, explanations, reasoning, simple math that can be answered by reasoning, writing, rewriting, translation, summarization, brainstorming, and text-based analysis. Also use the default model when an existing file, image, audio recording, or video can be processed through its dedicated processing category and the answer needs no tool. Not for multi-step calculations where exact numbers matter, such as year-by-year tables, loan or EMI schedules, compound interest, or totals over many values; those need specific_model. Also use the default model for advice or recommendations about a website, document, design, or other output when the user does not ask for it to be built.",
+      "specific_model": "The request needs web search, research, image generation or editing, video generation or editing, audio generation, code execution (including multi-step calculations where exact numbers matter, such as year-by-year tables, loan schedules, or compound interest), PDF generation, document generation, spreadsheet generation, presentation generation, or an artifact; or the user explicitly asks for a specific model. Do not select this merely because an existing file or media input needs processing through a dedicated processing category. Choose this for an output only when the user asks for it to be created or built, not when they only ask for advice about it. This includes a short confirmation such as 'yes' or 'do it' that approves a proposal in the recent turns needing one of these, such as redrawing a chart or making a file."
+    }
+  },
+  "reasoning_effort": {
+    "type": "choice",
+    "instructions": "How much thinking does this request need before answering?",
+    "criteria": {
+      "none": "Greetings, small talk, thanks, or simple lookups with an obvious answer.",
+      "low": "Simple questions, short writing, rewrites, or small code changes.",
+      "medium": "Normal analysis, explanations with several parts, multi-step coding, or planning.",
+      "high": "Hard problems: math proofs, tricky logic, complex debugging, system design, or legal and financial analysis where a mistake would be costly."
     }
   },
   "conversation_history": {
     "type": "choice",
-    "instructions": "Does fulfilling the request require retrieving earlier messages or responses from this conversation?",
+    "instructions": "The most recent conversation turns are always included. Does the request also need older conversation messages beyond those recent turns, and if so, how should they be found?",
     "criteria": {
-      "true": "The request depends on earlier conversation messages, assistant responses, decisions, explanations, or other discussion details that are not sufficiently included in the current request.",
-      "false": "The request can be fulfilled without retrieving earlier conversation messages or responses. A reference to a previously provided file alone does not require conversation history if the relevant file can be identified through previous-file metadata."
+      "none": "The recent turns already give enough context. This is the usual case, including short follow-ups such as 'yes', 'do it', 'make it shorter', or 'now do the same for the next one'. Also none for saved facts about the user or their product, such as 'what you know about our users'; those come from persistent memory. Also none for a previous file identifiable through file metadata. Also none when the current message quotes or pastes text from the recent turns; the pasted text is its own context.",
+      "position": "Older messages are needed, and the user points to a place in the conversation rather than a subject, such as 'at the very start', 'your first answer', or 'earlier today'.",
+      "topic": "Older messages are needed, and the user points to a subject discussed earlier and then left, such as 'what we decided about pricing' or 'the test cases from before'.",
+      "both": "Older messages are needed, and the user names both a subject and a place, such as 'what we said about pricing at the start'."
     }
   },
-  "memory_context": {
+  "memory": {
     "type": "choice",
-    "instructions": "Does fulfilling the request require persistent user memory saved from previous conversations?",
+    "instructions": "Does the request need to read saved memory about the user, save something new to memory, or both?",
     "criteria": {
-      "true": "The request depends on a saved user preference, personal detail, recurring constraint, or other persistent memory that is not sufficiently available in the current request or conversation.",
-      "false": "The request can be fulfilled without retrieving persistent user memory. Do not select true merely because earlier conversation messages or files may be relevant."
+      "none": "Neither. Ordinary questions, requests, or chat that do not depend on saved facts about the user and state nothing lasting to save. Earlier messages in this conversation are handled by conversation_history, not memory.",
+      "read": "The answer depends on saved facts about the user, their work, or their product, such as food preferences, diet, budget, schedule, writing style, audience, or users, and the user states nothing new to save. Examples: 'plan my meals for this week', 'based on what you know about our users, which languages should we support?'.",
+      "write": "The user states or confirms a lasting fact, preference, constraint, or decision to save, including asking you to remember something or saying yes to a proposal in the recent turns, and the answer does not depend on other saved facts. Examples: 'remember that I prefer short answers', 'we have no Chinese users'. Not one-time details that only matter to the current task, such as 'use blue for this chart', or short-lived facts such as where the user is right now. Never save passwords, account numbers, health details, or other sensitive information.",
+      "both": "The user states something new to save and the answer also depends on other saved facts, such as 'I've gone vegetarian, so redo my meal plan'."
     }
   },
   "previous_files_context": {
     "type": "choice",
-    "instructions": "Does the request require a file from an earlier interaction?",
+    "instructions": "Does the request require retrieving or using a specific file from an earlier interaction?",
     "criteria": {
-      "true": "The request requires information from a previously provided file that is not included among the current request's attachments. The available previous-file metadata must identify a relevant file.",
-      "false": "The request can be fulfilled using only the current request and its attachments, or no previous file is required. Never select true solely because previous-file metadata is available or because a current attachment exists."
+      "true": "The request requires the contents of a specific file provided in an earlier interaction, the file is not attached to the current request, and available file metadata identifies it. The file may be needed for reading, analysis, summarization, comparison, conversion, or another operation.",
+      "false": "No specific file from an earlier interaction is required. Do not select true merely because the user refers to an earlier conversation, discussion, decision, strategy, project, or previously discussed topic. Do not select true just because previous files exist or because a file might be useful."
     }
   },
   "file_processing": {
     "type": "choice",
-    "instructions": "Does the request require processing a newly provided non-image, non-audio, non-video file?",
+    "instructions": "Does the request require processing a non-media file?",
     "criteria": {
-      "true": "The current request includes a new non-media file whose contents must be read, extracted, analyzed, summarized, converted, compared, or otherwise processed. Select true even when the request also requires retrieving an earlier file.",
-      "false": "No newly provided non-media file requires processing. Do not select true merely because a file is mentioned or attached without a need to process its contents. Do not use this category for image, audio, or video processing."
+      "true": "A current or previously provided non-image, non-audio, non-video file must have its contents read, analyzed, summarized, converted, compared, or otherwise processed. Select true only when an actual file's contents need processing. Previous conversation messages, plans, decisions, and text responses do not count as files.",
+      "false": "No non-media file requires processing. Text pasted directly into the prompt, model-generated text, previous conversation messages, plans, decisions, and requests to create new files do not qualify. Do not select true merely because a file is mentioned."
     }
   },
   "image_analysis": {
     "type": "choice",
-    "instructions": "Does the request require analyzing an existing image provided with the current request?",
+    "instructions": "Does the request require analyzing a newly provided existing image?",
     "criteria": {
-      "true": "The request requires describing, interpreting, extracting text from, comparing, or otherwise analyzing a newly provided existing image.",
-      "false": "No newly provided image requires analysis. Choose false when an image is only a reference or input for image generation or editing, unless the request also explicitly requires analyzing that image."
+      "true": "The request requires describing, interpreting, comparing, extracting text from, or otherwise analyzing a newly provided image. Only for image files such as photos, screenshots, or scans sent as images. A PDF or document belongs to file_processing, even if it contains images.",
+      "false": "No image analysis is required. An image used only as a reference for generation or editing does not qualify unless analysis is also requested. A PDF or other document is not an image; it belongs to file_processing."
     }
   },
   "audio_processing": {
     "type": "choice",
-    "instructions": "Does the request require processing a newly provided audio input independently of any video?",
+    "instructions": "Does the request require processing separately provided existing audio?",
     "criteria": {
-      "true": "The request requires transcribing, analyzing, summarizing, translating, or extracting information from a separately provided audio input, or explicitly requests an audio-specific operation.",
-      "false": "No separate audio-processing operation is required. When audio is part of a video being processed, assign the overall video-processing requirement to video_processing. Do not select audio_processing merely because a video contains speech or sound."
+      "true": "The request requires transcribing, analyzing, summarizing, translating, or extracting information from a separately provided audio input.",
+      "false": "No separate audio processing is required. Audio contained within a video belongs to video_processing. Generating new audio belongs to specific_model."
     }
   },
   "video_processing": {
     "type": "choice",
     "instructions": "Does the request require processing a newly provided existing video?",
     "criteria": {
-      "true": "The request requires summarizing, analyzing, describing, transcribing, or extracting information from a newly provided video. This category covers the video as a whole, including relevant visual content, dialogue, speech, and audio when needed.",
-      "false": "No newly provided existing video requires processing. Choose false when the request is only to generate or modify a video rather than process an existing one, unless an existing video must also be analyzed."
+      "true": "The request requires analyzing, summarizing, describing, transcribing, or extracting information from an existing video, including its relevant visual and audio content. This does not include cutting, trimming, or otherwise editing a video; that is video editing and uses specific_model.",
+      "false": "No existing video processing is required. Generating or editing a video alone does not qualify."
     }
   }
 }
