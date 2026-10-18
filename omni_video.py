@@ -1,6 +1,7 @@
-"""Qwen Omni video/audio-to-text, ported from ai-platform's app/rag/omni.py (video + audio kinds)
-and app/libraries/video_processing.py + audio_processing.py (the PROMPTs). Used to transcribe
-each clip the video splitter and video processing pipeline produce. Omni models only answer
+"""Qwen Omni video/audio/page/image-to-text, ported from ai-platform's app/rag/omni.py (all four
+kinds) and app/libraries/{video,audio,file}_processing.py + image_analysis.py (the PROMPTs). Used
+to transcribe each clip the video splitter and video processing pipeline produce, and each
+rendered page / embedded image file_processing.py sends to Omni. Omni models only answer
 streaming requests and are asked for text output only, so the reply is accumulated from
 `delta.content`.
 
@@ -119,6 +120,77 @@ AUDIO_PROMPT = (
     "[MM:SS] Background noise, sound effects, environment (street, room, car)."
 )
 
+PAGE_PROMPT = (
+    "You convert one page of a document into a complete text record. Another AI will use only "
+    "your record to answer any future question about this page, and it will never see it. "
+    "Anything you leave out is lost.\n"
+    "\n"
+    "Rules:\n"
+    "- Do not answer questions, give opinions, or summarise. Only record what is on the page.\n"
+    "- Copy all text exactly as written, in normal reading order. Keep the original language "
+    "and spelling. Do not put body text in quotes; just reproduce it.\n"
+    "- Keep the structure: headings as headings, lists as lists, paragraphs as paragraphs.\n"
+    "- If something is unreadable, write [unreadable]. Never guess.\n"
+    "- Write descriptions in English.\n"
+    "\n"
+    "Output these sections, in this order, and skip any that do not apply:\n"
+    "\n"
+    "TEXT\n"
+    "The full text of the page in reading order, with its structure kept. Include headers, "
+    "footers, page numbers, captions and footnotes.\n"
+    "\n"
+    "TABLES\n"
+    "Every table rebuilt as a markdown table, with all rows, columns and values exactly as "
+    "shown.\n"
+    "\n"
+    "CHARTS\n"
+    "For each chart: type, title, axes, legend, and every data value or label shown.\n"
+    "\n"
+    "IMAGES AND DIAGRAMS\n"
+    "For each photo, diagram or illustration: what it shows, any text inside it (in quotes), "
+    "and where it sits on the page.\n"
+    "\n"
+    "OTHER MARKS\n"
+    "Stamps, signatures (record only that one is present), handwriting (transcribed), "
+    "highlights, logos."
+)
+
+IMAGE_PROMPT = (
+    "You convert an image into a complete text record. Another AI will use only your record to "
+    "answer any future question about this image, and it will never see the image. Anything you "
+    "leave out is lost.\n"
+    "\n"
+    "Rules:\n"
+    "- Do not answer questions, give opinions, or summarise. Only record what is there.\n"
+    "- Copy every visible word, number, price, label and symbol exactly as written, inside "
+    "quotes. Keep the original language and spelling, including mistakes.\n"
+    "- If something is unreadable, write [unreadable]. Never guess.\n"
+    "- Do not identify real people by name. Describe them instead.\n"
+    "- Write descriptions in English.\n"
+    "\n"
+    "Output these sections, in this order, and skip any that do not apply:\n"
+    "\n"
+    "TEXT\n"
+    "Every piece of visible text in reading order, each in quotes, with where it appears.\n"
+    "\n"
+    "OBJECTS\n"
+    "Everything visible: what it is, how many, colour, size, and position (for example \"top "
+    "left\", \"second shelf from the bottom\").\n"
+    "\n"
+    "PEOPLE\n"
+    "How many, approximate age range, clothing, expression, pose, and what each is doing.\n"
+    "\n"
+    "CHARTS AND TABLES\n"
+    "Chart type, title, axes, legend, and every value. Tables row by row, as a markdown table.\n"
+    "\n"
+    "SCENE\n"
+    "Setting, indoor or outdoor, lighting, time of day if visible, style (photo, screenshot, "
+    "drawing, document), and overall layout.\n"
+    "\n"
+    "OTHER DETAILS\n"
+    "Anything notable not covered above: logos, damage, watermarks, unusual items."
+)
+
 
 class OmniError(Exception):
     pass
@@ -203,5 +275,26 @@ async def transcribe_audio(data: bytes, *, audio_format: str = "mp3") -> tuple[s
     content = [
         {"type": "input_audio", "input_audio": {"data": f"{_AUDIO_DATA_PREFIX}{_b64(data)}", "format": audio_format}},
         {"type": "text", "text": AUDIO_PROMPT},
+    ]
+    return await _call_omni(content)
+
+
+async def transcribe_page(data: bytes, *, mime: str = "image/png") -> tuple[str, dict | None, int]:
+    """OCR one rendered document page (e.g. a scanned PDF page) with Qwen Omni. Returns
+    (text, usage, latency_ms) — see _call_omni. Raises OmniError on failure."""
+    content = [
+        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{_b64(data)}"}},
+        {"type": "text", "text": PAGE_PROMPT},
+    ]
+    return await _call_omni(content)
+
+
+async def analyze_image(data: bytes, *, mime: str = "image/png") -> tuple[str, dict | None, int]:
+    """OCR + describe one standalone image (or an embedded image pulled out of a document)
+    with Qwen Omni. Returns (text, usage, latency_ms) — see _call_omni. Raises OmniError on
+    failure."""
+    content = [
+        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{_b64(data)}"}},
+        {"type": "text", "text": IMAGE_PROMPT},
     ]
     return await _call_omni(content)

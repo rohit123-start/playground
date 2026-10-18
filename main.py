@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import FileResponse
 
+import file_processing
 import jev_ai
 import jev_model_picker
 import jev_prompt_scan
@@ -28,6 +29,7 @@ app.include_router(jev_model_picker.router)  # POST /jev-model-picker-{low,mediu
 app.include_router(jev_tool_model_routing.router)  # POST /jev-tool-model-routing
 app.include_router(video_splitter.router)  # POST /video-splitter/split
 app.include_router(video_processing.router)  # POST /video-processing/process
+app.include_router(file_processing.router)  # POST /file-processing/process
 
 
 @app.get("/playground", include_in_schema=False)
@@ -58,6 +60,11 @@ async def playground_video_splitter():
 @app.get("/playground/video-processing", include_in_schema=False)
 async def playground_video_processing():
     return _page("playground_video_processing.html")
+
+
+@app.get("/playground/file-processing", include_in_schema=False)
+async def playground_file_processing():
+    return _page("playground_file_processing.html")
 
 
 # Questions JSON shown and edited in the playground pages. PUT validates, saves, and applies
