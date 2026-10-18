@@ -243,6 +243,31 @@ async def _split_by_size(
     return out
 
 
+async def _reduce_for_omni(path: Path, tmp_dir: Path) -> Path:
+    """Caps fps and resolution with a single fast CRF pass (no bitrate target to chase) —
+    applied to EVERY clip sent to Omni, not just ones over OMNI_MAX_BYTES. The size threshold
+    only guards what Omni's API will *accept*; it says nothing about how long Omni *takes* to
+    look at a clip, which scales with frame count more than byte count (see OMNI_COMPRESS_FPS
+    above). A small clip under the size cap was still being sent at full fps/resolution and
+    taking just as long as an oversized one — this is what actually fixes that."""
+    vf = (
+        f"fps={OMNI_COMPRESS_FPS},"
+        f"scale=w='min({OMNI_COMPRESS_MAX_WIDTH},iw)':h='min({OMNI_COMPRESS_MAX_HEIGHT},ih)':"
+        "force_original_aspect_ratio=decrease"
+    )
+    out_path = tmp_dir / f"{path.stem}_omniready.mp4"
+    args = [
+        "-y", "-i", str(path), "-vf", vf,
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
+        "-c:a", "aac", "-b:a", "64k",
+        "-movflags", "+faststart", str(out_path),
+    ]
+    code, stderr = await _run_ffmpeg(args)
+    if code != 0 or not out_path.exists():
+        raise RuntimeError(stderr[-800:])
+    return out_path
+
+
 async def _compress_for_omni(path: Path, duration: float, tmp_dir: Path, target_mb: float) -> Path:
     """Re-encodes path for Omni: caps fps and resolution, not just bitrate (see OMNI_COMPRESS_FPS
     above), and uses two-pass H.264 so the result lands close to target_mb on the first try —
@@ -287,17 +312,22 @@ async def _compress_for_omni(path: Path, duration: float, tmp_dir: Path, target_
 async def _transcribe(path: Path, mime: str, duration: float, tmp_dir: Path) -> tuple[str | None, str | None, bool]:
     """Returns (text, error, compressed) — exactly one of text/error is set. Never raises: a
     transcription failure on one clip shouldn't fail the whole split (same fail-open rule
-    ai-platform's ingest uses). Compression only affects what's sent to Omni — the zip keeps the
-    original lossless stream-copied part."""
-    send_path, send_mime, compressed = path, mime, False
-    size = path.stat().st_size
+    ai-platform's ingest uses). The reduced/compressed copy only affects what's sent to Omni —
+    the zip keeps the original lossless stream-copied part."""
+    original_mb = path.stat().st_size / 1_000_000
+    try:
+        send_path, send_mime, compressed = await _reduce_for_omni(path, tmp_dir), "video/mp4", True
+    except Exception:
+        send_path, send_mime, compressed = path, mime, False  # fall back to the original on failure
+
+    size = send_path.stat().st_size
     if size > OMNI_MAX_BYTES:
         target_mb = OMNI_COMPRESS_TARGET_MB
         for _ in range(3):  # retry at a lower target if a hard-to-compress clip overshoots
             try:
-                send_path = await _compress_for_omni(path, duration, tmp_dir, target_mb)
+                send_path = await _compress_for_omni(send_path, duration, tmp_dir, target_mb)
             except Exception as err:
-                return None, f"clip too large for Omni OCR ({size / 1_000_000:.1f} MB > 15 MB) and compression failed: {err}", False
+                return None, f"clip too large for Omni OCR ({original_mb:.1f} MB > 15 MB) and compression failed: {err}", False
             send_mime, compressed = "video/mp4", True
             sent_size = send_path.stat().st_size
             if sent_size <= OMNI_MAX_BYTES:

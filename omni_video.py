@@ -1,8 +1,9 @@
-"""Qwen Omni video-to-text, ported from ai-platform's app/rag/omni.py (video kind) and
-app/libraries/video_processing.py (the video PROMPT). Used to transcribe each clip the video
-splitter produces. Transport: Qwen Cloud (DashScope) OpenAI-compatible endpoint, same as
-ai-platform's `qwen` app. Omni models only answer streaming requests and are asked for text
-output only, so the reply is accumulated from `delta.content`."""
+"""Qwen Omni video/audio-to-text, ported from ai-platform's app/rag/omni.py (video + audio kinds)
+and app/libraries/video_processing.py + audio_processing.py (the PROMPTs). Used to transcribe
+each clip the video splitter and video processing pipeline produce. Transport: Qwen Cloud
+(DashScope) OpenAI-compatible endpoint, same as ai-platform's `qwen` app. Omni models only answer
+streaming requests and are asked for text output only, so the reply is accumulated from
+`delta.content`."""
 import base64
 import logging
 import os
@@ -52,6 +53,42 @@ PROMPT = (
     "Each person label with appearance and clothing, so they can be recognised across the clip."
 )
 
+AUDIO_PROMPT = (
+    "You convert an audio file into a complete text record. Another AI will use only your record "
+    "to answer any future question about this audio, and it will never hear it. Anything you "
+    "leave out is lost.\n"
+    "\n"
+    "Rules:\n"
+    "- Do not answer questions, give opinions, or summarise. Only record what is heard.\n"
+    "- Timestamps are relative to the start of this file, in MM:SS.\n"
+    "- Transcribe speech word for word in its original language, including repetitions and "
+    "filler words. Do not clean it up or paraphrase.\n"
+    "- If a word is unclear, write [unclear]. Never guess.\n"
+    "- Label speakers Speaker 1, Speaker 2, and so on, and keep the same labels throughout. Do "
+    "not guess names unless a speaker says their own name.\n"
+    "- Write descriptions in English.\n"
+    "\n"
+    "Output these sections, in this order, and skip any that do not apply:\n"
+    "\n"
+    "OVERVIEW\n"
+    "What kind of audio this is (conversation, voice note, song, podcast, lecture, sound clip), "
+    "the number of speakers, the languages spoken, and the total length.\n"
+    "\n"
+    "SPEECH\n"
+    "[MM:SS] Speaker label: exact words. One line per turn.\n"
+    "\n"
+    "SPEAKERS\n"
+    "Each speaker label with voice description: approximate age range, tone, accent if clear, "
+    "and speaking style.\n"
+    "\n"
+    "MUSIC\n"
+    "[MM:SS–MM:SS] Genre, instruments, tempo (slow, medium or fast), key mood, and whether "
+    "there are vocals. Transcribe sung lyrics only if they are clearly audible.\n"
+    "\n"
+    "OTHER SOUNDS\n"
+    "[MM:SS] Background noise, sound effects, environment (street, room, car)."
+)
+
 
 class OmniError(Exception):
     pass
@@ -83,13 +120,8 @@ def _b64(data: bytes) -> str:
     return base64.b64encode(data).decode("ascii")
 
 
-async def transcribe_video(data: bytes, *, mime: str = "video/mp4") -> str:
-    """OCR / transcribe one video clip with Qwen Omni. Raises OmniError on failure."""
+async def _call_omni(content: list[dict]) -> str:
     client = _get_client()
-    content = [
-        {"type": "video_url", "video_url": {"url": f"data:{mime};base64,{_b64(data)}"}},
-        {"type": "text", "text": PROMPT},
-    ]
     parts: list[str] = []
     try:
         stream = await client.chat.completions.create(
@@ -108,3 +140,21 @@ async def transcribe_video(data: bytes, *, mime: str = "video/mp4") -> str:
         logger.exception("omni call failed (model=%s)", OMNI_MODEL)
         raise OmniError(f"{type(err).__name__}: {err}") from err
     return "".join(parts).strip()
+
+
+async def transcribe_video(data: bytes, *, mime: str = "video/mp4") -> str:
+    """OCR / transcribe one video clip with Qwen Omni. Raises OmniError on failure."""
+    content = [
+        {"type": "video_url", "video_url": {"url": f"data:{mime};base64,{_b64(data)}"}},
+        {"type": "text", "text": PROMPT},
+    ]
+    return await _call_omni(content)
+
+
+async def transcribe_audio(data: bytes, *, audio_format: str = "mp3") -> str:
+    """Transcribe one audio clip with Qwen Omni. Raises OmniError on failure."""
+    content = [
+        {"type": "input_audio", "input_audio": {"data": f"data:;base64,{_b64(data)}", "format": audio_format}},
+        {"type": "text", "text": AUDIO_PROMPT},
+    ]
+    return await _call_omni(content)
