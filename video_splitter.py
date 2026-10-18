@@ -5,6 +5,9 @@ imageio-ffmpeg, so no system install is required. Each part is then optionally t
 Qwen Omni (see omni_video.py) so the playground can show what's actually in each clip."""
 import asyncio
 import base64
+import bisect
+import math
+import os
 import re
 import tempfile
 import time
@@ -22,6 +25,7 @@ router = APIRouter()
 
 FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
 DURATION_RE = re.compile(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)")
+KEYFRAME_RE = re.compile(r"pts_time:(-?\d+\.?\d*)")
 MIME_BY_SUFFIX = {
     ".mp4": "video/mp4", ".mov": "video/quicktime", ".m4v": "video/mp4",
     ".mkv": "video/x-matroska", ".webm": "video/webm", ".avi": "video/x-msvideo",
@@ -36,6 +40,13 @@ MIME_BY_SUFFIX = {
 # 20,971,520 * 3/4 = 15,728,640 bytes (15 MiB). Stay comfortably under it.
 OMNI_MAX_BYTES = 15_000_000
 OMNI_COMPRESS_TARGET_MB = 13.0
+# Not just a smaller upload: fewer frames for Omni to analyze is normally the bigger latency win
+# (resolution alone mostly just shrinks the file). 2 fps / 720p are reasonable starting defaults,
+# not universal ones — fast motion needs more frames, small on-screen text may need more
+# resolution — but this is an automated pipeline with no way to make that per-video judgment call.
+OMNI_COMPRESS_FPS = 2
+OMNI_COMPRESS_MAX_WIDTH = 1280
+OMNI_COMPRESS_MAX_HEIGHT = 720
 
 
 class SplitMode(str, Enum):
@@ -65,7 +76,29 @@ async def _probe_duration(path: Path) -> float:
     return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
 
 
-def _segments(mode: SplitMode, value: str, duration: float) -> list[tuple[float, float]]:
+async def _keyframe_times(path: Path) -> list[float]:
+    """Sorted keyframe (I-frame) timestamps, always including 0.0 (every stream starts on one).
+    -skip_frame nokey makes ffmpeg skip decoding every non-key frame, so this is one fast pass
+    over the file's keyframe headers, not a full decode."""
+    args = ["-skip_frame", "nokey", "-i", str(path), "-vf", "showinfo", "-f", "null", os.devnull]
+    _, stderr = await _run_ffmpeg(args)
+    times = {0.0}
+    for m in KEYFRAME_RE.finditer(stderr):
+        t = float(m.group(1))
+        if t >= 0:
+            times.add(t)
+    return sorted(times)
+
+
+def _snap_down(t: float, keyframes: list[float]) -> float:
+    """The real start time a stream-copy -ss seek to t produces: the keyframe at or before t —
+    matching ffmpeg's own seek behavior, so our bookkeeping matches reality exactly instead of
+    drifting from whatever ffmpeg actually cut."""
+    idx = bisect.bisect_right(keyframes, t + 1e-6) - 1
+    return keyframes[max(idx, 0)]
+
+
+def _segments(mode: SplitMode, value: str, duration: float, keyframes: list[float]) -> list[tuple[float, float]]:
     if mode is SplitMode.PARTS:
         try:
             parts = int(value)
@@ -99,13 +132,31 @@ def _segments(mode: SplitMode, value: str, duration: float) -> list[tuple[float,
         bounds = [0.0, *cuts, duration]
 
     bounds[-1] = duration  # avoid float drift leaving a near-zero trailing segment
-    return [(bounds[i], bounds[i + 1]) for i in range(len(bounds) - 1)]
+
+    # Snap every internal boundary to the keyframe stream-copy will actually cut at (0 and
+    # duration are always valid: every stream starts on a keyframe, and duration is the file's
+    # true end). Boundaries that collapse onto the same keyframe are merged — the real part
+    # count can come out lower than requested if cut points fall within one keyframe interval;
+    # that's an honest reflection of what stream copy can actually produce, not a bug.
+    snapped = [0.0]
+    for b in bounds[1:-1]:
+        s = _snap_down(b, keyframes)
+        if s > snapped[-1] + 1e-3:
+            snapped.append(s)
+    snapped.append(duration)
+    return [(snapped[i], snapped[i + 1]) for i in range(len(snapped) - 1)]
 
 
 async def _cut_segment(input_path: Path, start: float, end: float, out_path: Path) -> None:
+    # Keyframe timestamps are often repeating decimals (e.g. 128 frames / 30fps = 8.533333...).
+    # Formatting at millisecond precision (.3f) used to ROUND THAT DOWN below the true keyframe
+    # (8.533333 -> "8.533", which is LESS than the keyframe) — ffmpeg's "-ss" then seeks to the
+    # PREVIOUS keyframe a whole GOP earlier, silently duplicating that GOP's content into this
+    # segment. Microsecond precision (.6f) plus a small upward nudge keeps -ss unambiguously at
+    # or after the intended keyframe, never below it.
     args = [
-        "-y", "-ss", f"{start:.3f}", "-i", str(input_path),
-        "-t", f"{end - start:.3f}", "-map", "0", "-c", "copy",
+        "-y", "-ss", f"{start + 1e-4:.6f}", "-i", str(input_path),
+        "-t", f"{end - start:.6f}", "-map", "0", "-c", "copy",
         "-avoid_negative_ts", "make_zero", str(out_path),
     ]
     code, stderr = await _run_ffmpeg(args)
@@ -115,53 +166,119 @@ async def _cut_segment(input_path: Path, start: float, end: float, out_path: Pat
 
 async def _split_by_size(
     input_path: Path, duration: float, target_bytes: float, tmp_dir: Path, stem: str, suffix: str,
+    keyframes: list[float],
 ) -> list[tuple[Path, float, float]]:
-    """Cuts segments sized to land near target_bytes each. Stream copy can't predict a cut's
-    output size ahead of time — it depends on local bitrate, not just duration — so each cut is
-    measured after the fact and re-cut smaller if it overshoots, then the next segment starts
-    from where this one actually ended (never from the original estimate)."""
-    total_bytes = input_path.stat().st_size
-    avg_bps = total_bytes / duration if duration > 0 else 0
-    local_bps = avg_bps  # updated from each cut's actual rate, so estimates track regional
-    out: list[tuple[Path, float, float]] = []       # bitrate shifts instead of reverting to the
-    start, i = 0.0, 0                                # file-wide average every segment.
+    """Cuts into ceil(total_size / target_bytes) parts — the minimum that can satisfy the target
+    — dividing the REMAINING duration evenly across the REMAINING part count at each step, rather
+    than estimating each part's length independently from the last part's bitrate (the latter
+    accumulates drift over several parts into a wasted undersized leftover part).
+
+    Every candidate boundary is chosen directly from `keyframes`, so `start` is always exactly
+    where stream copy will really cut (never a snapped-and-drifted approximation of it). That
+    matters beyond precision: an unaligned boundary makes the next part silently start earlier
+    than labeled (duplicating content with the part before it), which both inflates total output
+    size and corrupts the byte-rate estimate this function uses to plan ahead. With boundaries
+    pinned to real keyframes there is no overlap, so the estimate stays honest.
+
+    A short slice also carries a disproportionate I-frame cost relative to the file-wide average
+    (every slice pays for its own leading keyframe, which the average smooths out over many of
+    them) — so even an exact fair-share estimate tends to overshoot slightly and need a shrink.
+    FAIR_SHARE_MARGIN pre-emptively undershoots each estimate to absorb that, so the common case
+    needs no shrink at all. When a shrink is needed, it steps to the PREVIOUS keyframe rather
+    than an arbitrary smaller duration — again, so every attempt is a real, non-overlapping cut."""
+    FAIR_SHARE_MARGIN = 0.98
+    remaining_bytes_est = input_path.stat().st_size
+    out: list[tuple[Path, float, float]] = []
+    start, start_idx, i = 0.0, 0, 0
     while start < duration - 1e-6:
         i += 1
-        bps = local_bps if local_bps > 0 else avg_bps
-        seg_len = (target_bytes / bps) if bps > 0 else (duration - start)
-        end = min(start + seg_len, duration)
+        remaining_duration = duration - start
+        parts_left = max(1, math.ceil(remaining_bytes_est / target_bytes)) if target_bytes > 0 else 1
+        target_time = start + FAIR_SHARE_MARGIN * remaining_duration / parts_left
+
+        # The keyframe at/before target_time, but always at least one keyframe past `start` so
+        # we make forward progress even when the estimate lands short of the next keyframe.
+        idx = bisect.bisect_right(keyframes, min(target_time, duration) + 1e-6) - 1
+        idx = max(idx, start_idx + 1)
+        if idx < len(keyframes) and keyframes[idx] < duration - 1e-6:
+            end_idx, end = idx, keyframes[idx]
+        else:
+            end_idx, end = len(keyframes), duration  # no keyframe left before the file's true end
+
         out_path = tmp_dir / f"{stem}_part{i:02d}{suffix}"
-        for _ in range(5):  # shrink and re-cut if this stream-copied slice overshoots target
+        for _ in range(5):  # shrink to the previous keyframe if this slice overshoots target
             await _cut_segment(input_path, start, end, out_path)
             actual = out_path.stat().st_size
-            # Accept once it fits, or once it can't shrink further — NOT just because the
-            # estimate happened to reach the file's end (a stale bitrate estimate can land there
-            # even when there's plenty of oversized content left to split into more parts).
-            if actual <= target_bytes or end - start <= 0.5 + 1e-6:
+            # Accept once it fits, or once there's no earlier keyframe left to shrink to — NOT
+            # just because the estimate happened to reach the file's end (a stale estimate can
+            # land there even when there's plenty of oversized content left to split further).
+            if actual <= target_bytes or end >= duration - 1e-3 or end_idx <= start_idx + 1:
                 break
-            end = max(start + (end - start) * 0.85 * (target_bytes / actual), start + 0.5)
+            end_idx -= 1
+            end = keyframes[end_idx]
+
+        # Once it fits, greedily extend to the next keyframe(s) while it still fits. Rounding
+        # down to a keyframe means the fair-share estimate tends to land one keyframe short of
+        # what the target would actually allow — without this, a well-behaved file would
+        # systematically need one extra part beyond the true minimum.
+        for _ in range(20):
+            if actual > target_bytes or end >= duration - 1e-6:
+                break
+            if end_idx + 1 < len(keyframes) and keyframes[end_idx + 1] < duration - 1e-6:
+                cand_idx, cand_end = end_idx + 1, keyframes[end_idx + 1]
+            else:
+                cand_idx, cand_end = len(keyframes), duration
+            await _cut_segment(input_path, start, cand_end, out_path)
+            cand_actual = out_path.stat().st_size
+            if cand_actual > target_bytes:
+                await _cut_segment(input_path, start, end, out_path)  # revert to the last good cut
+                break
+            end_idx, end, actual = cand_idx, cand_end, cand_actual
+
         if end > start:
-            local_bps = out_path.stat().st_size / (end - start)
+            local_rate = actual / (end - start)
+            remaining_bytes_est = max(local_rate * (duration - end), 0.0)
         out.append((out_path, start, end))
-        start = end
+        start, start_idx = end, end_idx
     return out
 
 
 async def _compress_for_omni(path: Path, duration: float, tmp_dir: Path, target_mb: float) -> Path:
-    """Re-encodes path down to roughly target_mb so it clears OMNI_MAX_BYTES. Sized from the
-    clip's own known duration (start/end from _segments), so unlike the reference this was
-    ported from, it never shells out to ffprobe — imageio-ffmpeg doesn't bundle it."""
-    target_bitrate = max(int(target_mb * 8_000_000 / duration) - 64_000, 100_000)  # reserve 64kbps for audio
+    """Re-encodes path for Omni: caps fps and resolution, not just bitrate (see OMNI_COMPRESS_FPS
+    above), and uses two-pass H.264 so the result lands close to target_mb on the first try —
+    cutting how often the caller's retry loop needs to re-run the whole encode. Sized from the
+    clip's own known duration (start/end from the split step), so unlike the reference this was
+    ported from, it never shells out to ffprobe or re-decodes the file to count frames —
+    imageio-ffmpeg doesn't bundle ffprobe, and we already know the duration for free."""
+    audio_bitrate = 64_000
+    target_total_bitrate = int(target_mb * 1_000_000 * 8 / duration * 0.94)  # 6% muxing/container margin
+    video_bitrate = max(target_total_bitrate - audio_bitrate, 100_000)
+
+    vf = (
+        f"fps={OMNI_COMPRESS_FPS},"
+        f"scale=w='min({OMNI_COMPRESS_MAX_WIDTH},iw)':h='min({OMNI_COMPRESS_MAX_HEIGHT},ih)':"
+        "force_original_aspect_ratio=decrease"
+    )
     out_path = tmp_dir / f"{path.stem}_compressed.mp4"
-    args = [
-        "-y", "-i", str(path),
-        "-c:v", "libx264", "-preset", "fast",
-        "-b:v", str(target_bitrate), "-maxrate", str(target_bitrate), "-bufsize", str(target_bitrate * 2),
-        "-c:a", "aac", "-b:a", "64k",
-        "-movflags", "+faststart",
-        str(out_path),
+    passlog = str(tmp_dir / f"{path.stem}_passlog")
+
+    pass1 = [
+        "-y", "-i", str(path), "-vf", vf,
+        "-c:v", "libx264", "-preset", "fast", "-b:v", str(video_bitrate),
+        "-pass", "1", "-passlogfile", passlog, "-an", "-f", "null", os.devnull,
     ]
-    code, stderr = await _run_ffmpeg(args)
+    code, stderr = await _run_ffmpeg(pass1)
+    if code != 0:
+        raise RuntimeError(stderr[-800:])
+
+    pass2 = [
+        "-y", "-i", str(path), "-vf", vf,
+        "-c:v", "libx264", "-preset", "fast", "-b:v", str(video_bitrate),
+        "-pass", "2", "-passlogfile", passlog,
+        "-c:a", "aac", "-b:a", "64k",
+        "-movflags", "+faststart", str(out_path),
+    ]
+    code, stderr = await _run_ffmpeg(pass2)
     if code != 0 or not out_path.exists():
         raise RuntimeError(stderr[-800:])
     return out_path
@@ -217,6 +334,7 @@ async def split_video(
 
         task_start = time.perf_counter()
         duration = await _probe_duration(input_path)
+        keyframes = await _keyframe_times(input_path)
 
         out_paths: list[Path] = []
         if mode is SplitMode.SIZE:
@@ -226,11 +344,11 @@ async def split_video(
                 raise HTTPException(status_code=400, detail="size must be a number")
             if target_mb <= 0:
                 raise HTTPException(status_code=400, detail="size must be > 0")
-            cuts = await _split_by_size(input_path, duration, target_mb * 1_000_000, tmp_dir, stem, suffix)
+            cuts = await _split_by_size(input_path, duration, target_mb * 1_000_000, tmp_dir, stem, suffix, keyframes)
             segments = [(s, e) for _, s, e in cuts]
             out_paths = [p for p, _, _ in cuts]
         else:
-            segments = _segments(mode, value, duration)
+            segments = _segments(mode, value, duration, keyframes)
             for i, (start, end) in enumerate(segments, start=1):
                 out_path = tmp_dir / f"{stem}_part{i:02d}{suffix}"
                 await _cut_segment(input_path, start, end, out_path)

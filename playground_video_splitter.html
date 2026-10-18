@@ -131,7 +131,7 @@
     parts: { hint: "Splits into N equal-length parts.", placeholder: "e.g. 4" },
     duration: { hint: "Splits every N seconds.", placeholder: "e.g. 30" },
     timestamps: { hint: "Cut points in seconds, comma-separated (e.g. 30,90,150).", placeholder: "e.g. 30,90,150" },
-    size: { hint: "Splits so each part stays near N MB. Stream copy can't predict exact output size, so parts are measured and re-cut if they overshoot — this is approximate, not exact.", placeholder: "e.g. 100" },
+    size: { hint: "Splits into the minimum number of parts that each stay under N MB. Cuts land on real keyframes, so parts are exact and never overlap — but part count can go above the minimum if the video's actual keyframe layout doesn't allow a tighter split.", placeholder: "e.g. 100" },
   };
   function applyModeHint() {
     const h = HINTS[mode.value];
