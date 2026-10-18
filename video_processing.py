@@ -15,14 +15,17 @@ completed chunks after processing the ENTIRE file) specifically so cutting and O
 chunk 1 starts its Omni call as soon as it's cut, while chunk 2 is still being cut, instead of
 waiting for every chunk to exist before any Omni call begins. Re-encoding (not stream copy) means
 each cut is frame-accurate regardless of keyframes, so this needs none of video_splitter.py's
-keyframe-snapping machinery. Cutting itself is capped at CUT_CONCURRENCY concurrent ffmpeg
-processes — unlike Omni calls (I/O-bound, waiting on the network), ffmpeg re-encodes are CPU-bound,
-so running too many at once would oversubscribe the machine rather than speed anything up.
-Audio-only input keeps the simpler segment-muxer+stream-copy batch approach: it's already fast
-(no re-encode), so there's no meaningful split phase to overlap with anything."""
+keyframe-snapping machinery. Cutting itself is still capped at CUT_CONCURRENCY concurrent ffmpeg
+processes (CPU-bound, unlike the I/O-bound Omni calls) to avoid oversubscribing the machine, but
+that cap matters more than it looks: a chunk queued behind others for a cut slot has its Omni
+call delayed too, and if that chunk also happens to have a long Omni call, the queueing delay
+lands on the critical path. See CUT_CONCURRENCY's own comment. Audio-only input keeps the simpler
+segment-muxer+stream-copy batch approach: it's already fast (no re-encode), so there's no
+meaningful split phase to overlap with anything."""
 import asyncio
 import base64
 import math
+import os
 import re
 import tempfile
 import time
@@ -48,7 +51,20 @@ TIMESTAMP_RE = re.compile(r"\[(\d{1,3}):(\d{2})(?:[–-](\d{1,3}):(\d{2}))?\]")
 
 MAX_DURATION_SECONDS = 30 * 60  # reject anything longer before spending time processing it
 DEFAULT_SEGMENT_SECONDS = 180
-CUT_CONCURRENCY = 2  # concurrent ffmpeg re-encodes — CPU-bound, unlike the Omni calls alongside them
+# Concurrent ffmpeg re-encodes — CPU-bound, unlike the Omni calls alongside them. Verified both
+# failure modes on a real 5-chunk file before settling here:
+#   - Too low (originally 2): a chunk's cut can queue behind two earlier ones even though
+#     cutting (12-37s observed) is far cheaper than the Omni wait after it (31-161s observed) —
+#     if that queued chunk also has a long Omni call, the queueing delay lands on the critical
+#     path.
+#   - Too high (tried letting all 5 chunks cut at once): every cut measurably slowed down from
+#     CPU contention (a uniform ~32s each, vs. the staggered 13-37s at a lower cap) — confirming
+#     re-encoding really is CPU-bound enough to oversubscribe.
+# 4 is a middle ground, not a formally tuned optimum — Omni's own response time varies by 30-60%+
+# between otherwise-identical calls (confirmed: the SAME chunk took 160.6s in one run and 210.5s
+# in another), which dominates total latency more than this cap does. Don't over-index on this
+# number without more trials than are practical to run here.
+CUT_CONCURRENCY = min(4, os.cpu_count() or 4)
 # OMNI_MAX_BYTES/OMNI_COMPRESS_TARGET_MB and the video compressor are imported from
 # video_splitter.py rather than re-derived — it already found DashScope's real "max bytes per
 # data-uri item" limit empirically (see its own comment on OMNI_MAX_BYTES) and a proven two-pass,
