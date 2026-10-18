@@ -1,9 +1,17 @@
 """Qwen Omni video/audio-to-text, ported from ai-platform's app/rag/omni.py (video + audio kinds)
 and app/libraries/video_processing.py + audio_processing.py (the PROMPTs). Used to transcribe
-each clip the video splitter and video processing pipeline produce. Transport: Qwen Cloud
-(DashScope) OpenAI-compatible endpoint, same as ai-platform's `qwen` app. Omni models only answer
+each clip the video splitter and video processing pipeline produce. Omni models only answer
 streaming requests and are asked for text output only, so the reply is accumulated from
-`delta.content`."""
+`delta.content`.
+
+Two interchangeable transports, picked by OMNI_PROVIDER (env var, default "openrouter"):
+  - "openrouter": OPEN_ROUTER_API_KEY, already used everywhere else in this project, routes to
+    the same model (qwen/qwen3.8-omni-flash) pay-as-you-go — no "free quota" wall to hit.
+  - "dashscope": Qwen Cloud direct (QWEN_API_KEY), same as ai-platform's `qwen` app.
+Both speak the OpenAI-compatible chat.completions schema and accept the same video_url content
+block, confirmed against OpenRouter's own docs — but their input_audio.data field differs:
+DashScope accepts a data: URI prefix, OpenRouter requires raw base64 with NO prefix. That's the
+one place this module branches on provider."""
 import base64
 import logging
 import os
@@ -12,9 +20,30 @@ from openai import AsyncOpenAI
 
 logger = logging.getLogger("video_splitter.omni")
 
-OMNI_BASE_URL = os.environ.get("OMNI_BASE_URL", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1")
-OMNI_API_KEY_ENV = "QWEN_API_KEY"
-OMNI_MODEL = os.environ.get("OMNI_MODEL", "qwen3.8-omni-flash")
+_PROVIDERS = {
+    "openrouter": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "api_key_env": "OPEN_ROUTER_API_KEY",
+        "model_env": "OMNI_OPENROUTER_MODEL",
+        "default_model": "qwen/qwen3.8-omni-flash",
+        "audio_data_prefix": "",  # raw base64, no data: URI
+    },
+    "dashscope": {
+        "base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        "api_key_env": "QWEN_API_KEY",
+        "model_env": "OMNI_MODEL",
+        "default_model": "qwen3.8-omni-flash",
+        "audio_data_prefix": "data:;base64,",
+    },
+}
+
+OMNI_PROVIDER = os.environ.get("OMNI_PROVIDER", "openrouter").strip().lower()
+_cfg = _PROVIDERS.get(OMNI_PROVIDER, _PROVIDERS["openrouter"])
+
+OMNI_BASE_URL = os.environ.get("OMNI_BASE_URL", _cfg["base_url"])
+OMNI_API_KEY_ENV = _cfg["api_key_env"]
+OMNI_MODEL = os.environ.get(_cfg["model_env"], _cfg["default_model"])
+_AUDIO_DATA_PREFIX = _cfg["audio_data_prefix"]
 _MIN_PLAUSIBLE_KEY_LENGTH = 20
 
 PROMPT = (
@@ -154,7 +183,7 @@ async def transcribe_video(data: bytes, *, mime: str = "video/mp4") -> str:
 async def transcribe_audio(data: bytes, *, audio_format: str = "mp3") -> str:
     """Transcribe one audio clip with Qwen Omni. Raises OmniError on failure."""
     content = [
-        {"type": "input_audio", "input_audio": {"data": f"data:;base64,{_b64(data)}", "format": audio_format}},
+        {"type": "input_audio", "input_audio": {"data": f"{_AUDIO_DATA_PREFIX}{_b64(data)}", "format": audio_format}},
         {"type": "text", "text": AUDIO_PROMPT},
     ]
     return await _call_omni(content)

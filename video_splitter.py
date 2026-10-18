@@ -419,6 +419,7 @@ async def split_video(
             "omni_latency_ms": omni_latency_ms,
             "latency_ms": split_latency_ms + omni_latency_ms,
             "omni_configured": omni_video.is_configured(),
+            "omni_key_env": omni_video.OMNI_API_KEY_ENV,
             "transcribed": do_transcribe,
             "segments": segs_info,
             "zip_filename": f"{stem}_split.zip",

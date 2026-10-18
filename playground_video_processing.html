@@ -220,7 +220,7 @@
       );
       if (info.width) $("meta").append(el("span", {}, "Resolution ", el("b", {}, `${info.width}×${info.height}`)));
       if (!info.omni_configured) {
-        $("meta").append(el("span", { className: "err" }, "QWEN_API_KEY not configured — chunks were not transcribed"));
+        $("meta").append(el("span", { className: "err" }, `${info.omni_key_env || "Omni API key"} not configured — chunks were not transcribed`));
       }
 
       const tbody = $("chunks");

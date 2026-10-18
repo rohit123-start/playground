@@ -239,7 +239,7 @@
         el("span", {}, "Parts ", el("b", {}, segs.length)),
       );
       if (transcribe.checked && !info.omni_configured) {
-        $("meta").append(el("span", { className: "err" }, "QWEN_API_KEY not configured — parts were not transcribed"));
+        $("meta").append(el("span", { className: "err" }, `${info.omni_key_env || "Omni API key"} not configured — parts were not transcribed`));
       }
       const tbody = $("segments");
       tbody.replaceChildren();

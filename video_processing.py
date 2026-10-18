@@ -19,6 +19,8 @@ import imageio_ffmpeg
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 import omni_video
+from video_splitter import OMNI_COMPRESS_TARGET_MB, OMNI_MAX_BYTES
+from video_splitter import _compress_for_omni as _compress_video_for_omni
 
 router = APIRouter()
 
@@ -30,10 +32,11 @@ TIMESTAMP_RE = re.compile(r"\[(\d{1,3}):(\d{2})(?:[–-](\d{1,3}):(\d{2}))?\]")
 
 MAX_DURATION_SECONDS = 30 * 60  # reject anything longer before spending time processing it
 DEFAULT_SEGMENT_SECONDS = 180
-# Same binding DashScope limit video_splitter.py found empirically (see its OMNI_MAX_BYTES
-# comment) — a 720p/crf28 chunk from this pipeline rarely hits it, but a long, high-motion
-# segment still can.
-OMNI_MAX_BYTES = 15_000_000
+# OMNI_MAX_BYTES/OMNI_COMPRESS_TARGET_MB and the video compressor are imported from
+# video_splitter.py rather than re-derived — it already found DashScope's real "max bytes per
+# data-uri item" limit empirically (see its own comment on OMNI_MAX_BYTES) and a proven two-pass,
+# fps/resolution-capped compressor to fit under it. A 720p/crf28 chunk from this pipeline's own
+# split step rarely hits that limit, but a long or high-motion segment still can.
 
 
 async def _run_ffmpeg(args: list[str]) -> tuple[int, str]:
@@ -133,17 +136,52 @@ def _shift_timestamps(text: str, offset: float) -> str:
     return TIMESTAMP_RE.sub(repl, text)
 
 
-async def _process_chunk(path: Path, start: float, kind: str, audio_format: str) -> tuple[str | None, str | None]:
+async def _compress_audio_for_omni(path: Path, duration: float, tmp_dir: Path, target_mb: float) -> Path:
+    """Re-encodes an oversized audio chunk down to roughly target_mb. Audio has no fps/resolution
+    to cut, so this is just a bitrate-targeted re-encode (mirrors video_splitter's bitrate math,
+    minus the video-specific knobs)."""
+    bitrate = max(int(target_mb * 1_000_000 * 8 / duration * 0.94), 32_000)
+    out_path = tmp_dir / f"{path.stem}_compressed.mp3"
+    args = ["-y", "-i", str(path), "-c:a", "libmp3lame", "-b:a", str(bitrate), str(out_path)]
+    code, stderr = await _run_ffmpeg(args)
+    if code != 0 or not out_path.exists():
+        raise RuntimeError(stderr[-800:])
+    return out_path
+
+
+async def _process_chunk(
+    path: Path, start: float, end: float, kind: str, audio_format: str, tmp_dir: Path,
+) -> tuple[str | None, str | None]:
     """Returns (text, error) — exactly one is set. Never raises: one bad chunk shouldn't fail
-    the whole file (same fail-open rule video_splitter.py's _transcribe uses)."""
+    the whole file (same fail-open rule video_splitter.py's _transcribe uses). A chunk over
+    Qwen's real size limit (OMNI_MAX_BYTES) is compressed down to fit — not just rejected —
+    retrying at a lower target if a hard-to-compress chunk still overshoots, same pattern
+    video_splitter.py's _transcribe uses."""
+    send_path, send_audio_format = path, audio_format
     size = path.stat().st_size
     if size > OMNI_MAX_BYTES:
-        return None, f"chunk too large for Omni ({size / 1_000_000:.1f} MB > 15 MB) — try a shorter segment length"
+        duration = max(end - start, 0.5)
+        target_mb = OMNI_COMPRESS_TARGET_MB
+        compress = _compress_video_for_omni if kind == "video" else _compress_audio_for_omni
+        for _ in range(3):  # retry at a lower target if a hard-to-compress chunk overshoots
+            try:
+                send_path = await compress(send_path, duration, tmp_dir, target_mb)
+            except Exception as err:
+                return None, f"chunk too large for Omni ({size / 1_000_000:.1f} MB > 15 MB) and compression failed: {err}"
+            send_audio_format = "mp3"
+            sent_size = send_path.stat().st_size
+            if sent_size <= OMNI_MAX_BYTES:
+                break
+            target_mb *= 0.8 * OMNI_MAX_BYTES / sent_size
+        else:
+            sent_mb = send_path.stat().st_size / 1_000_000
+            return None, f"still too large for Omni after compression ({sent_mb:.1f} MB > 15 MB) — try a shorter segment length"
+
     try:
-        data = path.read_bytes()
+        data = send_path.read_bytes()
         text = await (
             omni_video.transcribe_video(data, mime="video/mp4") if kind == "video"
-            else omni_video.transcribe_audio(data, audio_format=audio_format)
+            else omni_video.transcribe_audio(data, audio_format=send_audio_format)
         )
         return _shift_timestamps(text, start), None
     except omni_video.OmniError as err:
@@ -191,10 +229,10 @@ async def process_video(
         audio_format = suffix.lstrip(".").lower() or "mp3"
         if do_process:
             results = await asyncio.gather(*(
-                _process_chunk(path, start, kind, audio_format) for path, start, _end in chunks
+                _process_chunk(path, start, end, kind, audio_format, tmp_dir) for path, start, end in chunks
             ))
         else:
-            results = [(None, "Omni not configured (set QWEN_API_KEY)")] * len(chunks)
+            results = [(None, f"Omni not configured (set {omni_video.OMNI_API_KEY_ENV})")] * len(chunks)
         omni_latency_ms = round((time.perf_counter() - omni_start) * 1000)
 
         chunks_info = []
@@ -223,6 +261,7 @@ async def process_video(
             "omni_latency_ms": omni_latency_ms,
             "latency_ms": split_latency_ms + omni_latency_ms,
             "omni_configured": do_process,
+            "omni_key_env": omni_video.OMNI_API_KEY_ENV,
             "chunks": chunks_info,
             "merged_text": merged_text,
             "zip_filename": f"{stem}_processed.zip",
