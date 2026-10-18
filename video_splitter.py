@@ -309,11 +309,15 @@ async def _compress_for_omni(path: Path, duration: float, tmp_dir: Path, target_
     return out_path
 
 
-async def _transcribe(path: Path, mime: str, duration: float, tmp_dir: Path) -> tuple[str | None, str | None, bool]:
-    """Returns (text, error, compressed) — exactly one of text/error is set. Never raises: a
-    transcription failure on one clip shouldn't fail the whole split (same fail-open rule
-    ai-platform's ingest uses). The reduced/compressed copy only affects what's sent to Omni —
-    the zip keeps the original lossless stream-copied part."""
+async def _transcribe(
+    path: Path, mime: str, duration: float, tmp_dir: Path,
+) -> tuple[str | None, str | None, bool, dict | None, int | None]:
+    """Returns (text, error, compressed, usage, omni_latency_ms) — exactly one of text/error is
+    set. Never raises: a transcription failure on one clip shouldn't fail the whole split (same
+    fail-open rule ai-platform's ingest uses). The reduced/compressed copy only affects what's
+    sent to Omni — the zip keeps the original lossless stream-copied part. usage/latency are
+    None on error (compression failures and timing before a dropped stream connection aren't
+    worth threading through)."""
     original_mb = path.stat().st_size / 1_000_000
     try:
         send_path, send_mime, compressed = await _reduce_for_omni(path, tmp_dir), "video/mp4", True
@@ -327,7 +331,7 @@ async def _transcribe(path: Path, mime: str, duration: float, tmp_dir: Path) -> 
             try:
                 send_path = await _compress_for_omni(send_path, duration, tmp_dir, target_mb)
             except Exception as err:
-                return None, f"clip too large for Omni OCR ({original_mb:.1f} MB > 15 MB) and compression failed: {err}", False
+                return None, f"clip too large for Omni OCR ({original_mb:.1f} MB > 15 MB) and compression failed: {err}", False, None, None
             send_mime, compressed = "video/mp4", True
             sent_size = send_path.stat().st_size
             if sent_size <= OMNI_MAX_BYTES:
@@ -335,12 +339,13 @@ async def _transcribe(path: Path, mime: str, duration: float, tmp_dir: Path) -> 
             target_mb *= 0.8 * OMNI_MAX_BYTES / sent_size
         else:
             sent_mb = send_path.stat().st_size / 1_000_000
-            return None, f"still too large for Omni OCR after compression ({sent_mb:.1f} MB > 15 MB) — split into more/smaller parts", True
+            return None, f"still too large for Omni OCR after compression ({sent_mb:.1f} MB > 15 MB) — split into more/smaller parts", True, None, None
 
     try:
-        return await omni_video.transcribe_video(send_path.read_bytes(), mime=send_mime), None, compressed
+        text, usage, latency_ms = await omni_video.transcribe_video(send_path.read_bytes(), mime=send_mime)
+        return text, None, compressed, usage, latency_ms
     except omni_video.OmniError as err:
-        return None, str(err), compressed
+        return None, str(err), compressed, None, None
 
 
 @router.post("/video-splitter/split")
@@ -392,26 +397,29 @@ async def split_video(
                 _transcribe(p, mime, end - start, tmp_dir) for p, (start, end) in zip(out_paths, segments)
             ))
         else:
-            results = [(None, None, False)] * len(out_paths)
+            results = [(None, None, False, None, None)] * len(out_paths)
         omni_latency_ms = round((time.perf_counter() - omni_start) * 1000)
 
         # Transcript .txt files ride along in the zip next to each part, named to match it, so
         # the download is self-contained — not just a dependency on reading the JSON response.
         zip_buf = BytesIO()
         with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
-            for out_path, (text, error, _compressed) in zip(out_paths, results):
+            for out_path, (text, error, _compressed, _usage, _chunk_latency_ms) in zip(out_paths, results):
                 zf.write(out_path, arcname=out_path.name)
                 if do_transcribe:
                     content = text if text else (f"[Omni OCR error: {error}]" if error else "[empty transcript]")
                     zf.writestr(out_path.stem + ".txt", content)
 
         segs_info = []
-        for i, ((start, end), out_path, (text, error, compressed)) in enumerate(zip(segments, out_paths, results), start=1):
+        for i, ((start, end), out_path, (text, error, compressed, usage, chunk_latency_ms)) in enumerate(zip(segments, out_paths, results), start=1):
             segs_info.append({
                 "index": i, "start": round(start, 3), "end": round(end, 3),
                 "filename": out_path.name, "size_bytes": out_path.stat().st_size,
                 "text": text, "error": error, "omni_compressed": compressed,
+                "omni_latency_ms": chunk_latency_ms, "omni_tokens": usage,
             })
+
+        tokens_total = sum(s["omni_tokens"]["total_tokens"] for s in segs_info if s["omni_tokens"])
 
         return {
             "duration": round(duration, 3),
@@ -420,6 +428,7 @@ async def split_video(
             "latency_ms": split_latency_ms + omni_latency_ms,
             "omni_configured": omni_video.is_configured(),
             "omni_key_env": omni_video.OMNI_API_KEY_ENV,
+            "omni_tokens_total": tokens_total,
             "transcribed": do_transcribe,
             "segments": segs_info,
             "zip_filename": f"{stem}_split.zip",

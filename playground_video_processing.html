@@ -97,7 +97,7 @@
       <button class="primary" id="download">Download ZIP</button>
     </div>
     <table id="chunktable" hidden>
-      <thead><tr><th>#</th><th>Start</th><th>End</th><th>Length</th><th>Size</th><th>Transcript</th></tr></thead>
+      <thead><tr><th>#</th><th>Start</th><th>End</th><th>Length</th><th>Size</th><th>Omni ms</th><th>Tokens</th><th>Transcript</th></tr></thead>
       <tbody id="chunks"></tbody>
     </table>
   </div>
@@ -130,6 +130,11 @@
   function fmtSize(bytes) {
     if (bytes === null || bytes === undefined) return "";
     return bytes >= 1_000_000 ? (bytes / 1_000_000).toFixed(1) + " MB" : (bytes / 1000).toFixed(0) + " KB";
+  }
+
+  function fmtTokens(usage) {
+    if (!usage) return "";
+    return `${usage.total_tokens} (${usage.prompt_tokens} in / ${usage.completion_tokens} out)`;
   }
 
   function el(tag, props = {}, ...kids) {
@@ -214,6 +219,7 @@
         el("span", {}, "Round trip ", el("b", {}, ms + " ms")),
         el("span", {}, "Split ", el("b", {}, info.split_latency_ms + " ms")),
         el("span", {}, "Omni OCR ", el("b", {}, info.omni_latency_ms + " ms")),
+        el("span", {}, "Tokens ", el("b", {}, info.omni_tokens_total ?? 0)),
         el("span", {}, "Duration ", el("b", {}, fmt(info.duration || 0))),
         el("span", {}, "Kind ", el("b", {}, info.kind)),
         el("span", {}, "Chunks ", el("b", {}, chunks.length)),
@@ -232,6 +238,8 @@
           el("td", { className: "num" }, fmt(c.end)),
           el("td", { className: "num" }, fmt(c.end - c.start)),
           el("td", { className: "num" }, fmtSize(c.size_bytes)),
+          el("td", { className: "num" }, c.omni_latency_ms ?? ""),
+          el("td", { className: "num" }, fmtTokens(c.omni_tokens)),
           el("td", { className: "text" }, transcriptCell(c)),
         ));
       });

@@ -15,6 +15,7 @@ one place this module branches on provider."""
 import base64
 import logging
 import os
+import time
 
 from openai import AsyncOpenAI
 
@@ -149,30 +150,46 @@ def _b64(data: bytes) -> str:
     return base64.b64encode(data).decode("ascii")
 
 
-async def _call_omni(content: list[dict]) -> str:
+async def _call_omni(content: list[dict]) -> tuple[str, dict | None, int]:
+    """Returns (text, usage, latency_ms). usage is {"prompt_tokens", "completion_tokens",
+    "total_tokens"} when the provider reports it — both OpenRouter and DashScope are
+    OpenAI-compatible and honor stream_options.include_usage, which puts a populated `usage` on
+    the final (otherwise-empty) stream chunk — else None. latency_ms times this call alone, so
+    per-chunk callers can show real per-clip Omni time instead of only the batch total."""
     client = _get_client()
     parts: list[str] = []
+    usage = None
+    start = time.perf_counter()
     try:
         stream = await client.chat.completions.create(
             model=OMNI_MODEL,
             messages=[{"role": "user", "content": content}],
             modalities=["text"],
             stream=True,
+            stream_options={"include_usage": True},
             temperature=0,
         )
         async for chunk in stream:
             if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
                 parts.append(chunk.choices[0].delta.content)
+            if getattr(chunk, "usage", None):
+                usage = {
+                    "prompt_tokens": chunk.usage.prompt_tokens,
+                    "completion_tokens": chunk.usage.completion_tokens,
+                    "total_tokens": chunk.usage.total_tokens,
+                }
     except OmniError:
         raise
     except Exception as err:
         logger.exception("omni call failed (model=%s)", OMNI_MODEL)
         raise OmniError(f"{type(err).__name__}: {err}") from err
-    return "".join(parts).strip()
+    latency_ms = round((time.perf_counter() - start) * 1000)
+    return "".join(parts).strip(), usage, latency_ms
 
 
-async def transcribe_video(data: bytes, *, mime: str = "video/mp4") -> str:
-    """OCR / transcribe one video clip with Qwen Omni. Raises OmniError on failure."""
+async def transcribe_video(data: bytes, *, mime: str = "video/mp4") -> tuple[str, dict | None, int]:
+    """OCR / transcribe one video clip with Qwen Omni. Returns (text, usage, latency_ms) —
+    see _call_omni. Raises OmniError on failure."""
     content = [
         {"type": "video_url", "video_url": {"url": f"data:{mime};base64,{_b64(data)}"}},
         {"type": "text", "text": PROMPT},
@@ -180,8 +197,9 @@ async def transcribe_video(data: bytes, *, mime: str = "video/mp4") -> str:
     return await _call_omni(content)
 
 
-async def transcribe_audio(data: bytes, *, audio_format: str = "mp3") -> str:
-    """Transcribe one audio clip with Qwen Omni. Raises OmniError on failure."""
+async def transcribe_audio(data: bytes, *, audio_format: str = "mp3") -> tuple[str, dict | None, int]:
+    """Transcribe one audio clip with Qwen Omni. Returns (text, usage, latency_ms) — see
+    _call_omni. Raises OmniError on failure."""
     content = [
         {"type": "input_audio", "input_audio": {"data": f"{_AUDIO_DATA_PREFIX}{_b64(data)}", "format": audio_format}},
         {"type": "text", "text": AUDIO_PROMPT},

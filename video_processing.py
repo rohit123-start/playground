@@ -151,12 +151,13 @@ async def _compress_audio_for_omni(path: Path, duration: float, tmp_dir: Path, t
 
 async def _process_chunk(
     path: Path, start: float, end: float, kind: str, audio_format: str, tmp_dir: Path,
-) -> tuple[str | None, str | None]:
-    """Returns (text, error) — exactly one is set. Never raises: one bad chunk shouldn't fail
-    the whole file (same fail-open rule video_splitter.py's _transcribe uses). A chunk over
-    Qwen's real size limit (OMNI_MAX_BYTES) is compressed down to fit — not just rejected —
-    retrying at a lower target if a hard-to-compress chunk still overshoots, same pattern
-    video_splitter.py's _transcribe uses."""
+) -> tuple[str | None, str | None, dict | None, int | None]:
+    """Returns (text, error, usage, omni_latency_ms) — exactly one of text/error is set. Never
+    raises: one bad chunk shouldn't fail the whole file (same fail-open rule video_splitter.py's
+    _transcribe uses). A chunk over Qwen's real size limit (OMNI_MAX_BYTES) is compressed down to
+    fit — not just rejected — retrying at a lower target if a hard-to-compress chunk still
+    overshoots, same pattern video_splitter.py's _transcribe uses. usage/latency are None on
+    error."""
     send_path, send_audio_format = path, audio_format
     size = path.stat().st_size
     if size > OMNI_MAX_BYTES:
@@ -167,7 +168,7 @@ async def _process_chunk(
             try:
                 send_path = await compress(send_path, duration, tmp_dir, target_mb)
             except Exception as err:
-                return None, f"chunk too large for Omni ({size / 1_000_000:.1f} MB > 15 MB) and compression failed: {err}"
+                return None, f"chunk too large for Omni ({size / 1_000_000:.1f} MB > 15 MB) and compression failed: {err}", None, None
             send_audio_format = "mp3"
             sent_size = send_path.stat().st_size
             if sent_size <= OMNI_MAX_BYTES:
@@ -175,17 +176,17 @@ async def _process_chunk(
             target_mb *= 0.8 * OMNI_MAX_BYTES / sent_size
         else:
             sent_mb = send_path.stat().st_size / 1_000_000
-            return None, f"still too large for Omni after compression ({sent_mb:.1f} MB > 15 MB) — try a shorter segment length"
+            return None, f"still too large for Omni after compression ({sent_mb:.1f} MB > 15 MB) — try a shorter segment length", None, None
 
     try:
         data = send_path.read_bytes()
-        text = await (
+        text, usage, latency_ms = await (
             omni_video.transcribe_video(data, mime="video/mp4") if kind == "video"
             else omni_video.transcribe_audio(data, audio_format=send_audio_format)
         )
-        return _shift_timestamps(text, start), None
+        return _shift_timestamps(text, start), None, usage, latency_ms
     except omni_video.OmniError as err:
-        return None, str(err)
+        return None, str(err), None, None
 
 
 @router.post("/video-processing/process")
@@ -232,16 +233,17 @@ async def process_video(
                 _process_chunk(path, start, end, kind, audio_format, tmp_dir) for path, start, end in chunks
             ))
         else:
-            results = [(None, f"Omni not configured (set {omni_video.OMNI_API_KEY_ENV})")] * len(chunks)
+            results = [(None, f"Omni not configured (set {omni_video.OMNI_API_KEY_ENV})", None, None)] * len(chunks)
         omni_latency_ms = round((time.perf_counter() - omni_start) * 1000)
 
         chunks_info = []
         merged_parts = []
-        for i, ((path, start, end), (text, error)) in enumerate(zip(chunks, results), start=1):
+        for i, ((path, start, end), (text, error, usage, chunk_latency_ms)) in enumerate(zip(chunks, results), start=1):
             chunks_info.append({
                 "index": i, "start": round(start, 3), "end": round(end, 3),
                 "filename": path.name, "size_bytes": path.stat().st_size,
                 "text": text, "error": error,
+                "omni_latency_ms": chunk_latency_ms, "omni_tokens": usage,
             })
             merged_parts.append(f"=== Chunk {i} ({_fmt_mmss(start)}–{_fmt_mmss(end)}) ===\n{text or f'[{error}]'}")
         merged_text = "\n\n".join(merged_parts)
@@ -251,6 +253,8 @@ async def process_video(
             for path, _start, _end in chunks:
                 zf.write(path, arcname=path.name)
             zf.writestr(f"{stem}_merged_transcript.txt", merged_text)
+
+        tokens_total = sum(c["omni_tokens"]["total_tokens"] for c in chunks_info if c["omni_tokens"])
 
         return {
             "duration": round(info["duration"], 3),
@@ -262,6 +266,7 @@ async def process_video(
             "latency_ms": split_latency_ms + omni_latency_ms,
             "omni_configured": do_process,
             "omni_key_env": omni_video.OMNI_API_KEY_ENV,
+            "omni_tokens_total": tokens_total,
             "chunks": chunks_info,
             "merged_text": merged_text,
             "zip_filename": f"{stem}_processed.zip",
