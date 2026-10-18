@@ -13,6 +13,7 @@ Both speak the OpenAI-compatible chat.completions schema and accept the same vid
 block, confirmed against OpenRouter's own docs — but their input_audio.data field differs:
 DashScope accepts a data: URI prefix, OpenRouter requires raw base64 with NO prefix. That's the
 one place this module branches on provider."""
+import asyncio
 import base64
 import logging
 import os
@@ -47,6 +48,13 @@ OMNI_API_KEY_ENV = _cfg["api_key_env"]
 OMNI_MODEL = os.environ.get(_cfg["model_env"], _cfg["default_model"])
 _AUDIO_DATA_PREFIX = _cfg["audio_data_prefix"]
 _MIN_PLAUSIBLE_KEY_LENGTH = 20
+# Retries for a failed Omni call on that SAME chunk/page/image — content-moderation false
+# positives in particular have already shown non-deterministic behavior across otherwise
+# identical calls in testing, so a second attempt genuinely can succeed where the first didn't.
+# Never applies to OmniNotConfigured (raised by _get_client, before any retry loop even starts)
+# — a missing/invalid key won't fix itself between attempts.
+OMNI_MAX_RETRIES = 2
+OMNI_RETRY_DELAY_SECONDS = 1.0
 
 PROMPT = (
     "You convert a video clip into a complete text record. Another AI will use only your record "
@@ -222,16 +230,11 @@ def _b64(data: bytes) -> str:
     return base64.b64encode(data).decode("ascii")
 
 
-async def _call_omni(content: list[dict]) -> tuple[str, dict | None, int]:
-    """Returns (text, usage, latency_ms). usage is {"prompt_tokens", "completion_tokens",
-    "total_tokens"} when the provider reports it — both OpenRouter and DashScope are
-    OpenAI-compatible and honor stream_options.include_usage, which puts a populated `usage` on
-    the final (otherwise-empty) stream chunk — else None. latency_ms times this call alone, so
-    per-chunk callers can show real per-clip Omni time instead of only the batch total."""
-    client = _get_client()
+async def _call_omni_once(client: AsyncOpenAI, content: list[dict]) -> tuple[str, dict | None]:
+    """One attempt, no retry — raises OmniError on failure. Split out of _call_omni so the retry
+    loop there can call this fresh each time without re-running _get_client()."""
     parts: list[str] = []
     usage = None
-    start = time.perf_counter()
     try:
         stream = await client.chat.completions.create(
             model=OMNI_MODEL,
@@ -255,8 +258,37 @@ async def _call_omni(content: list[dict]) -> tuple[str, dict | None, int]:
     except Exception as err:
         logger.exception("omni call failed (model=%s)", OMNI_MODEL)
         raise OmniError(f"{type(err).__name__}: {err}") from err
-    latency_ms = round((time.perf_counter() - start) * 1000)
-    return "".join(parts).strip(), usage, latency_ms
+    return "".join(parts).strip(), usage
+
+
+async def _call_omni(content: list[dict]) -> tuple[str, dict | None, int]:
+    """Returns (text, usage, latency_ms). usage is {"prompt_tokens", "completion_tokens",
+    "total_tokens"} when the provider reports it — both OpenRouter and DashScope are
+    OpenAI-compatible and honor stream_options.include_usage, which puts a populated `usage` on
+    the final (otherwise-empty) stream chunk — else None. latency_ms times the WHOLE call
+    including any retries, so a per-chunk caller's reported latency reflects what it actually
+    waited, not just the final successful attempt.
+
+    Retries up to OMNI_MAX_RETRIES times on failure, for this SAME chunk/page/image — see
+    OMNI_MAX_RETRIES' own comment for why that's worth doing here. OmniNotConfigured is raised by
+    _get_client() below, outside this loop, so a missing/invalid key is never retried."""
+    client = _get_client()
+    start = time.perf_counter()
+    last_err: OmniError | None = None
+    for attempt in range(OMNI_MAX_RETRIES + 1):
+        try:
+            text, usage = await _call_omni_once(client, content)
+            latency_ms = round((time.perf_counter() - start) * 1000)
+            return text, usage, latency_ms
+        except OmniError as err:
+            last_err = err
+            if attempt < OMNI_MAX_RETRIES:
+                logger.warning(
+                    "omni call failed (attempt %d/%d), retrying: %s",
+                    attempt + 1, OMNI_MAX_RETRIES + 1, err,
+                )
+                await asyncio.sleep(OMNI_RETRY_DELAY_SECONDS)
+    raise last_err
 
 
 async def transcribe_video(data: bytes, *, mime: str = "video/mp4") -> tuple[str, dict | None, int]:
