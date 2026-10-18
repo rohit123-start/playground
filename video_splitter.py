@@ -6,6 +6,7 @@ import asyncio
 import json
 import re
 import tempfile
+import time
 import zipfile
 from enum import Enum
 from io import BytesIO
@@ -100,6 +101,7 @@ async def split_video(
             while chunk := await file.read(1 << 20):
                 f.write(chunk)
 
+        task_start = time.perf_counter()
         duration = await _probe_duration(input_path)
         segments = _segments(mode, value, duration)
 
@@ -117,7 +119,12 @@ async def split_video(
                     raise HTTPException(status_code=500, detail=f"ffmpeg failed on part {i}: {stderr[-800:]}")
                 zf.write(out_path, arcname=out_path.name)
 
-        info = json.dumps({"duration": round(duration, 3), "segments": [[round(s, 3), round(e, 3)] for s, e in segments]})
+        latency_ms = round((time.perf_counter() - task_start) * 1000)
+        info = json.dumps({
+            "duration": round(duration, 3),
+            "segments": [[round(s, 3), round(e, 3)] for s, e in segments],
+            "latency_ms": latency_ms,
+        })
         return Response(
             content=zip_buf.getvalue(),
             media_type="application/zip",

@@ -165,6 +165,7 @@
       const segs = info.segments || [];
       $("meta").append(
         el("span", {}, "Round trip ", el("b", {}, ms + " ms")),
+        el("span", {}, "Task latency ", el("b", {}, (info.latency_ms ?? "n/a") + " ms")),
         el("span", {}, "Duration ", el("b", {}, fmt(info.duration || 0))),
         el("span", {}, "Parts ", el("b", {}, segs.length)),
       );
