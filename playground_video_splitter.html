@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Splitter Playground</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --text: #1c1c1a; --muted: #6b6b66; --line: #e2e2dd;
+    --accent: #2f5fd0; --accent-text: #ffffff; --good: #1f7a45; --bad: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --card: #1e1e1c; --text: #ecece8; --muted: #9a9a93; --line: #34342f;
+      --accent: #6c93f0; --accent-text: #10131a; --good: #5fd08a; --bad: #f2877f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; font-weight: 600; margin-bottom: 8px; }
+  input[type="text"], input[type="file"], select {
+    padding: 9px 12px; font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px;
+  }
+  [hidden] { display: none !important; }
+  .row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+  button.primary { background: var(--accent); color: var(--accent-text); border: 0; border-radius: 8px;
+                   padding: 9px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.primary:disabled { opacity: .6; cursor: default; }
+  .hint { color: var(--muted); font-size: 13px; }
+  .meta { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+  .meta b { color: var(--text); }
+  .err { color: var(--bad); white-space: pre-wrap; word-break: break-word; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-top: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; border-top: 0; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .nav { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+  .nav a { border: 1px solid var(--line); color: var(--text); border-radius: 999px; padding: 4px 14px;
+           font-size: 13px; text-decoration: none; }
+  .nav a[aria-current="page"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <nav class="nav">
+    <a href="/playground">Tool selection</a>
+    <a href="/playground/prompt-scan">Prompt scan (JEV)</a>
+    <a href="/playground/model-picker">Model picker (JEV)</a>
+    <a href="/playground/tool-model-routing">Tool model routing (JEV)</a>
+    <a href="/playground/video-splitter" aria-current="page">Video splitter</a>
+  </nav>
+  <h1>Video Splitter Playground</h1>
+  <p class="sub">Sends a video to <code>POST /video-splitter/split</code>, which splits it with ffmpeg's stream copy
+  (<code>-c copy</code>, via <code>imageio-ffmpeg</code>) — no re-encoding, so it's fast and lossless, but cuts snap
+  to the nearest preceding keyframe rather than the exact time requested.</p>
+
+  <div class="card">
+    <label for="file">Video file</label>
+    <input type="file" id="file" accept="video/*">
+    <div class="row">
+      <select id="mode">
+        <option value="parts">Equal parts</option>
+        <option value="duration">Fixed length (seconds)</option>
+        <option value="timestamps">Custom timestamps (seconds)</option>
+      </select>
+      <input type="text" id="value" style="flex:1;min-width:160px" placeholder="e.g. 4">
+    </div>
+    <div class="row">
+      <button class="primary" id="split">Split</button>
+      <span class="hint" id="hint">Splits into N equal-length parts.</span>
+    </div>
+  </div>
+
+  <div class="card" id="result" hidden>
+    <div class="meta" id="meta"></div>
+    <div id="err"></div>
+    <table id="segtable" hidden>
+      <thead><tr><th>#</th><th>Start</th><th>End</th><th>Length</th></tr></thead>
+      <tbody id="segments"></tbody>
+    </table>
+    <div class="row" id="downloadRow" hidden>
+      <button class="primary" id="download">Download ZIP again</button>
+    </div>
+  </div>
+</main>
+
+<script>
+  const BASE = location.protocol.startsWith("http") ? "" : "http://localhost:8000";
+  const ROUTE = BASE + "/video-splitter/split";
+  const $ = (id) => document.getElementById(id);
+  const file = $("file"), mode = $("mode"), value = $("value"), split = $("split"), hint = $("hint");
+
+  const HINTS = {
+    parts: { hint: "Splits into N equal-length parts.", placeholder: "e.g. 4" },
+    duration: { hint: "Splits every N seconds.", placeholder: "e.g. 30" },
+    timestamps: { hint: "Cut points in seconds, comma-separated (e.g. 30,90,150).", placeholder: "e.g. 30,90,150" },
+  };
+  function applyModeHint() {
+    const h = HINTS[mode.value];
+    hint.textContent = h.hint;
+    value.placeholder = h.placeholder;
+  }
+  mode.addEventListener("change", applyModeHint);
+  applyModeHint();
+
+  function fmt(s) {
+    s = Math.max(0, s);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    const pad = (n) => String(n).padStart(2, "0");
+    return (h > 0 ? h + ":" + pad(m) : m) + ":" + sec.toFixed(2).padStart(5, "0");
+  }
+
+  let lastBlob = null, lastName = "split.zip";
+  function triggerDownload(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  function errorText(detail, fallback) {
+    return detail ? (typeof detail === "string" ? detail : JSON.stringify(detail)) : (fallback || "Request failed");
+  }
+
+  async function run() {
+    if (!file.files[0]) { file.focus(); return; }
+    if (!value.value.trim()) { value.focus(); return; }
+
+    split.disabled = true; split.textContent = "Splitting…";
+    $("result").hidden = false;
+    $("err").textContent = "";
+    $("segtable").hidden = true;
+    $("downloadRow").hidden = true;
+    $("meta").replaceChildren();
+
+    const fd = new FormData();
+    fd.append("file", file.files[0]);
+    fd.append("mode", mode.value);
+    fd.append("value", value.value.trim());
+
+    const start = performance.now();
+    try {
+      const r = await fetch(ROUTE, { method: "POST", body: fd });
+      const ms = Math.round(performance.now() - start);
+      if (!r.ok) {
+        let detail = null;
+        try { detail = (await r.json()).detail; } catch {}
+        $("err").textContent = errorText(detail, r.status + " " + r.statusText);
+        $("meta").append(el("span", {}, "Status ", el("b", {}, r.status)));
+        return;
+      }
+      const info = JSON.parse(r.headers.get("X-Split-Info") || "{}");
+      const disposition = r.headers.get("Content-Disposition") || "";
+      const nameMatch = disposition.match(/filename="([^"]+)"/);
+      lastName = nameMatch ? nameMatch[1] : "split.zip";
+      lastBlob = await r.blob();
+
+      const segs = info.segments || [];
+      $("meta").append(
+        el("span", {}, "Round trip ", el("b", {}, ms + " ms")),
+        el("span", {}, "Duration ", el("b", {}, fmt(info.duration || 0))),
+        el("span", {}, "Parts ", el("b", {}, segs.length)),
+      );
+      const tbody = $("segments");
+      tbody.replaceChildren();
+      segs.forEach(([s, e], i) => {
+        tbody.append(el("tr", {},
+          el("td", {}, String(i + 1)),
+          el("td", { className: "num" }, fmt(s)),
+          el("td", { className: "num" }, fmt(e)),
+          el("td", { className: "num" }, fmt(e - s)),
+        ));
+      });
+      $("segtable").hidden = segs.length === 0;
+      $("downloadRow").hidden = false;
+      triggerDownload(lastBlob, lastName);
+    } catch (e) {
+      $("err").textContent = String(e);
+    } finally {
+      split.disabled = false; split.textContent = "Split";
+    }
+  }
+
+  function el(tag, props = {}, ...kids) {
+    const n = Object.assign(document.createElement(tag), props);
+    n.append(...kids);
+    return n;
+  }
+
+  split.addEventListener("click", run);
+  $("download").addEventListener("click", () => { if (lastBlob) triggerDownload(lastBlob, lastName); });
+</script>
+</body>
+</html>

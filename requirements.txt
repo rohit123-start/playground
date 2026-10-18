@@ -2,3 +2,5 @@ fastapi>=0.142
 uvicorn>=0.54
 httpx>=0.28
 python-dotenv>=1.2
+python-multipart>=0.0.20
+imageio-ffmpeg>=0.5

@@ -7,6 +7,7 @@ import jev_ai
 import jev_model_picker
 import jev_prompt_scan
 import jev_tool_model_routing
+import video_splitter
 
 BASE_DIR = Path(__file__).parent
 
@@ -24,6 +25,7 @@ app.include_router(jev_ai.router)  # POST /jev-open-router-tool
 app.include_router(jev_prompt_scan.router)  # POST /jev-prompt-scan-open-router
 app.include_router(jev_model_picker.router)  # POST /jev-model-picker-{low,medium,high}
 app.include_router(jev_tool_model_routing.router)  # POST /jev-tool-model-routing
+app.include_router(video_splitter.router)  # POST /video-splitter/split
 
 
 @app.get("/playground", include_in_schema=False)
@@ -44,6 +46,11 @@ async def playground_model_picker():
 @app.get("/playground/tool-model-routing", include_in_schema=False)
 async def playground_tool_model_routing():
     return _page("playground_tool_model_routing.html")
+
+
+@app.get("/playground/video-splitter", include_in_schema=False)
+async def playground_video_splitter():
+    return _page("playground_video_splitter.html")
 
 
 # Questions JSON shown and edited in the playground pages. PUT validates, saves, and applies
