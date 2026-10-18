@@ -44,6 +44,20 @@
   .nav a { border: 1px solid var(--line); color: var(--text); border-radius: 999px; padding: 4px 14px;
            font-size: 13px; text-decoration: none; }
   .nav a[aria-current="page"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .checkrow { display: flex; align-items: center; gap: 8px; }
+  .checkrow label { margin: 0; font-weight: 400; }
+  td.text { max-width: 320px; }
+  .text-preview { white-space: pre-wrap; word-break: break-word; }
+  .text-link { background: none; border: 0; color: var(--accent); font: inherit; font-weight: 600;
+               cursor: pointer; padding: 0; text-decoration: underline; }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex;
+                     align-items: center; justify-content: center; padding: 24px; z-index: 10; }
+  .modal { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px;
+           max-width: 640px; width: 100%; max-height: 80vh; display: flex; flex-direction: column; }
+  .modal h2 { margin: 0 0 12px; font-size: 15px; }
+  .modal pre { margin: 0; overflow: auto; white-space: pre-wrap; word-break: break-word;
+               font: 13px/1.5 ui-monospace, Consolas, monospace; }
+  .modal .row { justify-content: flex-end; margin-top: 16px; }
 </style>
 </head>
 <body>
@@ -58,7 +72,9 @@
   <h1>Video Splitter Playground</h1>
   <p class="sub">Sends a video to <code>POST /video-splitter/split</code>, which splits it with ffmpeg's stream copy
   (<code>-c copy</code>, via <code>imageio-ffmpeg</code>) — no re-encoding, so it's fast and lossless, but cuts snap
-  to the nearest preceding keyframe rather than the exact time requested.</p>
+  to the nearest preceding keyframe rather than the exact time requested. Each part is then transcribed with
+  Qwen Omni OCR (<code>omni_video.py</code>, ported from ai-platform), and the ZIP includes a matching
+  <code>.txt</code> transcript file alongside each video part.</p>
 
   <div class="card">
     <label for="file">Video file</label>
@@ -68,8 +84,12 @@
         <option value="parts">Equal parts</option>
         <option value="duration">Fixed length (seconds)</option>
         <option value="timestamps">Custom timestamps (seconds)</option>
+        <option value="size">Max size per part (MB)</option>
       </select>
       <input type="text" id="value" style="flex:1;min-width:160px" placeholder="e.g. 4">
+    </div>
+    <div class="row">
+      <div class="checkrow"><input type="checkbox" id="transcribe" checked><label for="transcribe">Transcribe each part with Omni OCR (Qwen)</label></div>
     </div>
     <div class="row">
       <button class="primary" id="split">Split</button>
@@ -79,9 +99,9 @@
 
   <div class="card" id="result" hidden>
     <div class="meta" id="meta"></div>
-    <div id="err"></div>
+    <div id="err" class="err"></div>
     <table id="segtable" hidden>
-      <thead><tr><th>#</th><th>Start</th><th>End</th><th>Length</th></tr></thead>
+      <thead><tr><th>#</th><th>Start</th><th>End</th><th>Length</th><th>Size</th><th>Transcript</th></tr></thead>
       <tbody id="segments"></tbody>
     </table>
     <div class="row" id="downloadRow" hidden>
@@ -90,16 +110,28 @@
   </div>
 </main>
 
+<div class="modal-backdrop" id="modalBackdrop" hidden>
+  <div class="modal">
+    <h2 id="modalTitle">Transcript</h2>
+    <pre id="modalText"></pre>
+    <div class="row">
+      <button class="primary" id="modalClose">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
   const BASE = location.protocol.startsWith("http") ? "" : "http://localhost:8000";
   const ROUTE = BASE + "/video-splitter/split";
+  const TEXT_INLINE_LIMIT = 400;
   const $ = (id) => document.getElementById(id);
-  const file = $("file"), mode = $("mode"), value = $("value"), split = $("split"), hint = $("hint");
+  const file = $("file"), mode = $("mode"), value = $("value"), split = $("split"), hint = $("hint"), transcribe = $("transcribe");
 
   const HINTS = {
     parts: { hint: "Splits into N equal-length parts.", placeholder: "e.g. 4" },
     duration: { hint: "Splits every N seconds.", placeholder: "e.g. 30" },
     timestamps: { hint: "Cut points in seconds, comma-separated (e.g. 30,90,150).", placeholder: "e.g. 30,90,150" },
+    size: { hint: "Splits so each part stays near N MB. Stream copy can't predict exact output size, so parts are measured and re-cut if they overshoot — this is approximate, not exact.", placeholder: "e.g. 100" },
   };
   function applyModeHint() {
     const h = HINTS[mode.value];
@@ -116,6 +148,11 @@
     return (h > 0 ? h + ":" + pad(m) : m) + ":" + sec.toFixed(2).padStart(5, "0");
   }
 
+  function fmtSize(bytes) {
+    if (bytes === null || bytes === undefined) return "";
+    return bytes >= 1_000_000 ? (bytes / 1_000_000).toFixed(1) + " MB" : (bytes / 1000).toFixed(0) + " KB";
+  }
+
   let lastBlob = null, lastName = "split.zip";
   function triggerDownload(blob, name) {
     const url = URL.createObjectURL(blob);
@@ -125,8 +162,40 @@
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
 
+  function zipFromBase64(b64) {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: "application/zip" });
+  }
+
   function errorText(detail, fallback) {
     return detail ? (typeof detail === "string" ? detail : JSON.stringify(detail)) : (fallback || "Request failed");
+  }
+
+  // ---- Transcript modal: opened for any transcript longer than TEXT_INLINE_LIMIT.
+  const modalBackdrop = $("modalBackdrop"), modalTitle = $("modalTitle"), modalText = $("modalText");
+  function openModal(title, text) {
+    modalTitle.textContent = title;
+    modalText.textContent = text;
+    modalBackdrop.hidden = false;
+  }
+  function closeModal() { modalBackdrop.hidden = true; }
+  $("modalClose").addEventListener("click", closeModal);
+  modalBackdrop.addEventListener("click", (e) => { if (e.target === modalBackdrop) closeModal(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !modalBackdrop.hidden) closeModal(); });
+
+  function transcriptCell(seg) {
+    const badge = seg.omni_compressed ? el("div", { className: "hint" }, "(compressed for Omni, > 15 MB)") : null;
+    const wrap = (...kids) => badge ? el("div", {}, badge, ...kids) : el("div", {}, ...kids);
+    if (seg.error) return wrap(el("span", { className: "err" }, seg.error));
+    if (seg.text === null || seg.text === undefined) return wrap(el("span", { className: "hint" }, "not transcribed"));
+    if (seg.text === "") return wrap(el("span", { className: "hint" }, "(empty)"));
+    if (seg.text.length <= TEXT_INLINE_LIMIT) return wrap(el("div", { className: "text-preview" }, seg.text));
+    const preview = seg.text.slice(0, 160).trimEnd() + "…";
+    const btn = el("button", { className: "text-link", type: "button" }, `View full (${seg.text.length} chars)`);
+    btn.addEventListener("click", () => openModal(`Part ${seg.index} transcript`, seg.text));
+    return wrap(el("div", { className: "text-preview hint" }, preview), btn);
   }
 
   async function run() {
@@ -144,39 +213,43 @@
     fd.append("file", file.files[0]);
     fd.append("mode", mode.value);
     fd.append("value", value.value.trim());
+    fd.append("transcribe", transcribe.checked ? "true" : "false");
 
     const start = performance.now();
     try {
       const r = await fetch(ROUTE, { method: "POST", body: fd });
       const ms = Math.round(performance.now() - start);
+      const info = await r.json().catch(() => null);
       if (!r.ok) {
-        let detail = null;
-        try { detail = (await r.json()).detail; } catch {}
-        $("err").textContent = errorText(detail, r.status + " " + r.statusText);
+        $("err").textContent = errorText(info && info.detail, r.status + " " + r.statusText);
         $("meta").append(el("span", {}, "Status ", el("b", {}, r.status)));
         return;
       }
-      const info = JSON.parse(r.headers.get("X-Split-Info") || "{}");
-      const disposition = r.headers.get("Content-Disposition") || "";
-      const nameMatch = disposition.match(/filename="([^"]+)"/);
-      lastName = nameMatch ? nameMatch[1] : "split.zip";
-      lastBlob = await r.blob();
+
+      lastName = info.zip_filename || "split.zip";
+      lastBlob = zipFromBase64(info.zip_base64);
 
       const segs = info.segments || [];
       $("meta").append(
         el("span", {}, "Round trip ", el("b", {}, ms + " ms")),
-        el("span", {}, "Task latency ", el("b", {}, (info.latency_ms ?? "n/a") + " ms")),
+        el("span", {}, "Split ", el("b", {}, info.split_latency_ms + " ms")),
+        el("span", {}, "Omni OCR ", el("b", {}, info.omni_latency_ms + " ms")),
         el("span", {}, "Duration ", el("b", {}, fmt(info.duration || 0))),
         el("span", {}, "Parts ", el("b", {}, segs.length)),
       );
+      if (transcribe.checked && !info.omni_configured) {
+        $("meta").append(el("span", { className: "err" }, "QWEN_API_KEY not configured — parts were not transcribed"));
+      }
       const tbody = $("segments");
       tbody.replaceChildren();
-      segs.forEach(([s, e], i) => {
+      segs.forEach((seg) => {
         tbody.append(el("tr", {},
-          el("td", {}, String(i + 1)),
-          el("td", { className: "num" }, fmt(s)),
-          el("td", { className: "num" }, fmt(e)),
-          el("td", { className: "num" }, fmt(e - s)),
+          el("td", {}, String(seg.index)),
+          el("td", { className: "num" }, fmt(seg.start)),
+          el("td", { className: "num" }, fmt(seg.end)),
+          el("td", { className: "num" }, fmt(seg.end - seg.start)),
+          el("td", { className: "num" }, fmtSize(seg.size_bytes)),
+          el("td", { className: "text" }, transcriptCell(seg)),
         ));
       });
       $("segtable").hidden = segs.length === 0;
