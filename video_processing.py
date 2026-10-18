@@ -127,10 +127,12 @@ def _plan_video_segments(duration: float, segment_seconds: int) -> list[tuple[fl
 
 
 async def _cut_video_chunk(input_path: Path, start: float, end: float, out_path: Path) -> None:
+    # "scale=-2:720" alone is a target HEIGHT, not a cap — it upscales a source already below
+    # 720p (confirmed: a 480p source came out as 720p). min(720,ih) makes it a real ceiling.
     args = [
         "-y", "-ss", f"{start:.3f}", "-i", str(input_path), "-t", f"{end - start:.3f}",
         "-map", "0:v:0", "-map", "0:a?",
-        "-vf", "scale=-2:720",
+        "-vf", "scale=w=-2:h='min(720,ih)'",
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
         "-c:a", "aac",
         str(out_path),
