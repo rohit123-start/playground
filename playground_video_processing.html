@@ -70,10 +70,10 @@
   </nav>
   <h1>Video Processing Playground</h1>
   <p class="sub">Sends a video or audio file to <code>POST /video-processing/process</code>: rejects anything over
-  30 minutes, splits video down to 720p chunks (re-encoded, ffmpeg's segment muxer) or audio-only input with
-  stream copy when possible, transcribes every chunk with Qwen Omni concurrently, then restores one original
-  timeline by shifting each chunk's <code>[MM:SS]</code> markers by its real (ffmpeg-reported, not assumed)
-  start time.</p>
+  30 minutes, splits video down to 720p chunks (re-encoded one at a time) or audio-only input with stream copy
+  when possible, transcribes every chunk with Qwen Omni, then restores one original timeline by shifting each
+  chunk's <code>[MM:SS]</code> markers by its real start time. Video chunks are cut and transcribed with the next
+  chunk's cut overlapping the previous chunk's Omni call, instead of waiting for every chunk to exist first.</p>
 
   <div class="card">
     <label for="file">Video or audio file</label>
@@ -81,7 +81,7 @@
     <div class="row">
       <label style="margin:0" for="segSeconds">Segment length (seconds)</label>
       <input type="number" id="segSeconds" value="180" min="1" style="width:100px">
-      <span class="hint">Target length per chunk — actual boundaries snap to keyframes, so this is approximate.</span>
+      <span class="hint">Target length per chunk. Exact for video (each chunk is re-encoded, not keyframe-limited); audio boundaries can drift slightly since that path still uses stream copy.</span>
     </div>
     <div class="row">
       <button class="primary" id="process">Process</button>
@@ -97,7 +97,7 @@
       <button class="primary" id="download">Download ZIP</button>
     </div>
     <table id="chunktable" hidden>
-      <thead><tr><th>#</th><th>Start</th><th>End</th><th>Length</th><th>Size</th><th>Omni ms</th><th>Tokens</th><th>Transcript</th></tr></thead>
+      <thead><tr><th>#</th><th>Start</th><th>End</th><th>Length</th><th>Size</th><th>Cut ms</th><th>Omni ms</th><th>Tokens</th><th>Transcript</th></tr></thead>
       <tbody id="chunks"></tbody>
     </table>
   </div>
@@ -217,13 +217,21 @@
       const chunks = info.chunks || [];
       $("meta").append(
         el("span", {}, "Round trip ", el("b", {}, ms + " ms")),
-        el("span", {}, "Split ", el("b", {}, info.split_latency_ms + " ms")),
-        el("span", {}, "Omni OCR ", el("b", {}, info.omni_latency_ms + " ms")),
+        el("span", {}, "Process ", el("b", {}, info.process_latency_ms + " ms")),
         el("span", {}, "Tokens ", el("b", {}, info.omni_tokens_total ?? 0)),
         el("span", {}, "Duration ", el("b", {}, fmt(info.duration || 0))),
         el("span", {}, "Kind ", el("b", {}, info.kind)),
         el("span", {}, "Chunks ", el("b", {}, chunks.length)),
       );
+      if (info.kind === "video") {
+        $("meta").append(el("span", { className: "hint" },
+          `(cut+Omni overlap, not separate phases — ${info.split_latency_ms} ms total ffmpeg work, ${info.omni_latency_ms} ms wall clock)`));
+      } else {
+        $("meta").append(
+          el("span", {}, "Split ", el("b", {}, info.split_latency_ms + " ms")),
+          el("span", {}, "Omni OCR ", el("b", {}, info.omni_latency_ms + " ms")),
+        );
+      }
       if (info.width) $("meta").append(el("span", {}, "Resolution ", el("b", {}, `${info.width}×${info.height}`)));
       if (!info.omni_configured) {
         $("meta").append(el("span", { className: "err" }, `${info.omni_key_env || "Omni API key"} not configured — chunks were not transcribed`));
@@ -238,6 +246,7 @@
           el("td", { className: "num" }, fmt(c.end)),
           el("td", { className: "num" }, fmt(c.end - c.start)),
           el("td", { className: "num" }, fmtSize(c.size_bytes)),
+          el("td", { className: "num" }, c.cut_latency_ms ?? ""),
           el("td", { className: "num" }, c.omni_latency_ms ?? ""),
           el("td", { className: "num" }, fmtTokens(c.omni_tokens)),
           el("td", { className: "text" }, transcriptCell(c)),
