@@ -80,7 +80,11 @@
   file-type router: PDF pages use their own text layer, and only get rendered + sent to Omni when that layer is
   (near) empty or a single embedded image dominates the page. DOCX/PPTX/XLSX use native readers for text and send
   only embedded images worth analyzing to Omni. Images/audio/video go to Omni whole. The key number below is
-  <b>units using Omni</b> out of total units — how much of the file actually needed vision, not the page count.</p>
+  <b>units using Omni</b> out of total units — how much of the file actually needed vision, not the page count.
+  <b>Omni OCR</b> is the sum of every Omni call's own latency. A PDF's qualifying pages all OCR concurrently, and
+  multiple images on one slide/sheet do too, so the sum overstates the wait there — but DOCX/PPTX/XLSX still walk
+  their slides/sheets one at a time (matching ai-platform's own structure), so across those the sum is close to
+  the actual wait; the slowest single call (also shown) is the floor either way.</p>
 
   <div class="card">
     <label for="file">File (PDF, DOCX, PPTX, XLSX, image, audio, video, or plain text)</label>
@@ -193,6 +197,7 @@
       $("meta").append(
         el("span", {}, "Round trip ", el("b", {}, ms + " ms")),
         el("span", {}, "Server ", el("b", {}, info.latency_ms + " ms")),
+        el("span", {}, "Omni OCR ", el("b", {}, (info.omni_latency_ms ?? 0) + " ms"), el("span", { className: "hint" }, ` (slowest call ${info.omni_latency_max_ms ?? 0} ms)`)),
         el("span", {}, "Kind ", el("b", {}, info.kind)),
         el("span", {}, "Units ", el("b", {}, info.unit_count)),
         el("span", {}, "Omni calls ", el("b", {}, info.omni_call_count)),

@@ -427,6 +427,12 @@ async def process_file_endpoint(file: UploadFile = File(...)):
     ]
     tokens_total = sum(c.tokens["total_tokens"] for c in result.omni_calls if c.tokens)
     units_with_omni = sum(1 for u in result.units if u.omni_used)
+    omni_latencies = [c.latency_ms for c in result.omni_calls if c.latency_ms is not None]
+    # Sum: total Omni compute across every call — NOT wall clock, since calls within a page/image
+    # batch run concurrently (asyncio.gather). Max: the single slowest call, which is roughly the
+    # wall-clock floor those concurrent calls actually cost, closer to what a person feels waiting.
+    omni_latency_sum_ms = sum(omni_latencies)
+    omni_latency_max_ms = max(omni_latencies) if omni_latencies else 0
 
     combined_text = "\n\n".join(
         f"=== {'Page/Unit ' + str(u.index) if u.index is not None else 'Document'} ({u.content_type}) ===\n{u.text}"
@@ -443,6 +449,8 @@ async def process_file_endpoint(file: UploadFile = File(...)):
         "omni_calls": omni_calls_info,
         "omni_call_count": len(omni_calls_info),
         "omni_tokens_total": tokens_total,
+        "omni_latency_ms": omni_latency_sum_ms,
+        "omni_latency_max_ms": omni_latency_max_ms,
         "latency_ms": latency_ms,
         "units": [
             {"index": u.index, "content_type": u.content_type, "text": u.text, "omni_used": u.omni_used}
