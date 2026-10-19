@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import FileResponse
 
+import audio_processing
 import file_processing
 import image_processing
 import jev_ai
@@ -32,6 +33,7 @@ app.include_router(video_splitter.router)  # POST /video-splitter/split
 app.include_router(video_processing.router)  # POST /video-processing/process
 app.include_router(file_processing.router)  # POST /file-processing/process
 app.include_router(image_processing.router)  # POST /image-processing/process
+app.include_router(audio_processing.router)  # POST /audio-processing/process
 
 
 @app.get("/playground", include_in_schema=False)
@@ -72,6 +74,11 @@ async def playground_file_processing():
 @app.get("/playground/image-processing", include_in_schema=False)
 async def playground_image_processing():
     return _page("playground_image_processing.html")
+
+
+@app.get("/playground/audio-processing", include_in_schema=False)
+async def playground_audio_processing():
+    return _page("playground_audio_processing.html")
 
 
 # Questions JSON shown and edited in the playground pages. PUT validates, saves, and applies

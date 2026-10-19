@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audio Processing Playground</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --text: #1c1c1a; --muted: #6b6b66; --line: #e2e2dd;
+    --accent: #2f5fd0; --accent-text: #ffffff; --good: #1f7a45; --bad: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --card: #1e1e1c; --text: #ecece8; --muted: #9a9a93; --line: #34342f;
+      --accent: #6c93f0; --accent-text: #10131a; --good: #5fd08a; --bad: #f2877f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; font-weight: 600; margin-bottom: 8px; }
+  input[type="file"] {
+    padding: 9px 12px; font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px;
+  }
+  [hidden] { display: none !important; }
+  .row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+  button.primary { background: var(--accent); color: var(--accent-text); border: 0; border-radius: 8px;
+                   padding: 9px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.primary:disabled { opacity: .6; cursor: default; }
+  .hint { color: var(--muted); font-size: 13px; }
+  .meta { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+  .meta b { color: var(--text); }
+  .err { color: var(--bad); white-space: pre-wrap; word-break: break-word; }
+  .nav { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+  .nav a { border: 1px solid var(--line); color: var(--text); border-radius: 999px; padding: 4px 14px;
+           font-size: 13px; text-decoration: none; }
+  .nav a[aria-current="page"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .text-link { background: none; border: 0; color: var(--accent); font: inherit; font-weight: 600;
+               cursor: pointer; padding: 0; text-decoration: underline; }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex;
+                     align-items: center; justify-content: center; padding: 24px; z-index: 10; }
+  .modal { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px;
+           max-width: 700px; width: 100%; max-height: 80vh; display: flex; flex-direction: column; }
+  .modal h2 { margin: 0 0 12px; font-size: 15px; }
+  .modal pre { margin: 0; overflow: auto; white-space: pre-wrap; word-break: break-word;
+               font: 13px/1.5 ui-monospace, Consolas, monospace; }
+  .modal .row { justify-content: flex-end; margin-top: 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  td.num { white-space: nowrap; color: var(--muted); }
+  td.preview { max-width: 360px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <nav class="nav">
+    <a href="/playground">Tool selection</a>
+    <a href="/playground/prompt-scan">Prompt scan (JEV)</a>
+    <a href="/playground/model-picker">Model picker (JEV)</a>
+    <a href="/playground/tool-model-routing">Tool model routing (JEV)</a>
+    <a href="/playground/video-splitter">Video splitter</a>
+    <a href="/playground/video-processing">Video processing</a>
+    <a href="/playground/file-processing">File processing</a>
+    <a href="/playground/image-processing">Image processing</a>
+    <a href="/playground/audio-processing" aria-current="page">Audio processing</a>
+  </nav>
+  <h1>Audio Processing Playground</h1>
+  <p class="sub">Sends one or more audio files to <code>POST /audio-processing/process</code> — a direct port of
+  ai-platform's <code>audio_processing.py</code> (a fixed-prompt Qwen Omni audio call; no chunking in that codebase
+  — standalone audio is sent whole). Files run concurrently, each with its own Omni latency and token count.
+  Unlike the image section, audio routinely exceeds Qwen's real per-item size limit for audio (~6 MB — lower than
+  video/image's ~15 MB limit, confirmed by live testing) just from running a few minutes long, so an oversized
+  file is automatically re-encoded down to a lower bitrate and retried before being rejected.</p>
+
+  <div class="card">
+    <label for="files">Audio files</label>
+    <input type="file" id="files" accept="audio/*" multiple>
+    <div class="row">
+      <button class="primary" id="process">Process</button>
+    </div>
+  </div>
+
+  <div class="card" id="result" hidden>
+    <div class="meta" id="meta"></div>
+    <div id="err" class="err"></div>
+    <table id="table" hidden>
+      <thead>
+        <tr><th>File</th><th>Duration</th><th>Size</th><th>Latency</th><th>Tokens</th><th>Transcript</th></tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</main>
+
+<div class="modal-backdrop" id="modalBackdrop" hidden>
+  <div class="modal">
+    <h2 id="modalTitle">Transcript</h2>
+    <pre id="modalText"></pre>
+    <div class="row">
+      <button class="primary" id="modalClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const BASE = location.protocol.startsWith("http") ? "" : "http://localhost:8000";
+  const ROUTE = BASE + "/audio-processing/process";
+  const $ = (id) => document.getElementById(id);
+  const files = $("files"), process_ = $("process");
+
+  function el(tag, props = {}, ...kids) {
+    const n = Object.assign(document.createElement(tag), props);
+    n.append(...kids);
+    return n;
+  }
+
+  function fmtSize(bytes) {
+    if (bytes === null || bytes === undefined) return "";
+    return bytes >= 1_000_000 ? (bytes / 1_000_000).toFixed(1) + " MB" : (bytes / 1000).toFixed(0) + " KB";
+  }
+
+  function fmtDuration(sec) {
+    if (sec === null || sec === undefined) return "";
+    const m = Math.floor(sec / 60), s = Math.round(sec % 60);
+    return `${m}:${String(s).padStart(2, "0")}`;
+  }
+
+  function fmtTokens(usage) {
+    if (!usage) return "";
+    return `${usage.total_tokens} tok`;
+  }
+
+  function errorText(detail, fallback) {
+    return detail ? (typeof detail === "string" ? detail : JSON.stringify(detail)) : (fallback || "Request failed");
+  }
+
+  const modalBackdrop = $("modalBackdrop"), modalTitle = $("modalTitle"), modalText = $("modalText");
+  function openModal(title, text) {
+    modalTitle.textContent = title;
+    modalText.textContent = text;
+    modalBackdrop.hidden = false;
+  }
+  function closeModal() { modalBackdrop.hidden = true; }
+  $("modalClose").addEventListener("click", closeModal);
+  modalBackdrop.addEventListener("click", (e) => { if (e.target === modalBackdrop) closeModal(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !modalBackdrop.hidden) closeModal(); });
+
+  function row(r) {
+    const tr = el("tr");
+    tr.append(el("td", {}, r.filename));
+    tr.append(el("td", { className: "num" }, fmtDuration(r.duration)));
+    tr.append(el("td", { className: "num" }, fmtSize(r.size_bytes)));
+    tr.append(el("td", { className: "num" }, r.latency_ms !== null ? r.latency_ms + " ms" : ""));
+    tr.append(el("td", { className: "num" }, fmtTokens(r.usage)));
+    const tc = el("td", { className: "preview" });
+    if (r.error) {
+      tc.append(el("span", { className: "err" }, r.error));
+    } else if (r.text) {
+      tc.append(el("span", {}, r.text.slice(0, 160)));
+      const btn = el("button", { className: "text-link", type: "button" }, ` View full (${r.text.length} chars)`);
+      btn.addEventListener("click", () => openModal(r.filename, r.text));
+      tc.append(document.createElement("br"), btn);
+    } else {
+      tc.append(el("span", { className: "hint" }, "(empty)"));
+    }
+    tr.append(tc);
+    return tr;
+  }
+
+  async function run() {
+    if (!files.files.length) { files.focus(); return; }
+
+    process_.disabled = true; process_.textContent = "Processing…";
+    $("result").hidden = false;
+    $("err").textContent = "";
+    $("table").hidden = true;
+    $("tbody").replaceChildren();
+    $("meta").replaceChildren();
+
+    const fd = new FormData();
+    Array.from(files.files).forEach((f) => fd.append("files", f));
+
+    const start = performance.now();
+    try {
+      const r = await fetch(ROUTE, { method: "POST", body: fd });
+      const ms = Math.round(performance.now() - start);
+      const info = await r.json().catch(() => null);
+      if (!r.ok) {
+        $("err").textContent = errorText(info && info.detail, r.status + " " + r.statusText);
+        $("meta").append(el("span", {}, "Status ", el("b", {}, r.status)));
+        return;
+      }
+
+      $("meta").append(
+        el("span", {}, "Round trip ", el("b", {}, ms + " ms")),
+        el("span", {}, "Server ", el("b", {}, info.latency_ms + " ms")),
+        el("span", {}, "Omni ", el("b", {}, info.omni_latency_ms + " ms"), el("span", { className: "hint" }, ` (slowest ${info.omni_latency_max_ms} ms)`)),
+        el("span", {}, "Files ", el("b", {}, info.audio_count)),
+        el("span", {}, "Tokens ", el("b", {}, info.omni_tokens_total ?? 0)),
+      );
+      if (!info.omni_configured) {
+        $("meta").append(el("span", { className: "err" }, `${info.omni_key_env || "Omni API key"} not configured — files will show an error`));
+      }
+
+      const tbody = $("tbody");
+      (info.audios || []).forEach((r) => tbody.append(row(r)));
+      $("table").hidden = false;
+    } catch (e) {
+      $("err").textContent = String(e);
+    } finally {
+      process_.disabled = false; process_.textContent = "Process";
+    }
+  }
+
+  process_.addEventListener("click", run);
+</script>
+</body>
+</html>
