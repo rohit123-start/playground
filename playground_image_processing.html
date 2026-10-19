@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Image Processing Playground</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --text: #1c1c1a; --muted: #6b6b66; --line: #e2e2dd;
+    --accent: #2f5fd0; --accent-text: #ffffff; --good: #1f7a45; --bad: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --card: #1e1e1c; --text: #ecece8; --muted: #9a9a93; --line: #34342f;
+      --accent: #6c93f0; --accent-text: #10131a; --good: #5fd08a; --bad: #f2877f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; font-weight: 600; margin-bottom: 8px; }
+  input[type="file"] {
+    padding: 9px 12px; font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px;
+  }
+  [hidden] { display: none !important; }
+  .row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+  button.primary { background: var(--accent); color: var(--accent-text); border: 0; border-radius: 8px;
+                   padding: 9px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.primary:disabled { opacity: .6; cursor: default; }
+  .hint { color: var(--muted); font-size: 13px; }
+  .meta { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+  .meta b { color: var(--text); }
+  .err { color: var(--bad); white-space: pre-wrap; word-break: break-word; }
+  .nav { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+  .nav a { border: 1px solid var(--line); color: var(--text); border-radius: 999px; padding: 4px 14px;
+           font-size: 13px; text-decoration: none; }
+  .nav a[aria-current="page"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .text-link { background: none; border: 0; color: var(--accent); font: inherit; font-weight: 600;
+               cursor: pointer; padding: 0; text-decoration: underline; }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex;
+                     align-items: center; justify-content: center; padding: 24px; z-index: 10; }
+  .modal { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px;
+           max-width: 700px; width: 100%; max-height: 80vh; display: flex; flex-direction: column; }
+  .modal h2 { margin: 0 0 12px; font-size: 15px; }
+  .modal pre { margin: 0; overflow: auto; white-space: pre-wrap; word-break: break-word;
+               font: 13px/1.5 ui-monospace, Consolas, monospace; }
+  .modal .row { justify-content: flex-end; margin-top: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+  .imgcard { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); display: flex; flex-direction: column; }
+  .imgcard .thumb { width: 100%; height: 160px; object-fit: contain; background: var(--card); border-bottom: 1px solid var(--line); }
+  .imgcard .body { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .imgcard .fname { font-weight: 600; font-size: 13px; word-break: break-all; }
+  .imgcard .stats { font-size: 12px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+  .imgcard .preview { font-size: 13px; white-space: pre-wrap; word-break: break-word; max-height: 90px; overflow: hidden; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <nav class="nav">
+    <a href="/playground">Tool selection</a>
+    <a href="/playground/prompt-scan">Prompt scan (JEV)</a>
+    <a href="/playground/model-picker">Model picker (JEV)</a>
+    <a href="/playground/tool-model-routing">Tool model routing (JEV)</a>
+    <a href="/playground/video-splitter">Video splitter</a>
+    <a href="/playground/video-processing">Video processing</a>
+    <a href="/playground/file-processing">File processing</a>
+    <a href="/playground/image-processing" aria-current="page">Image processing</a>
+  </nav>
+  <h1>Image Processing Playground</h1>
+  <p class="sub">Sends one or more images to <code>POST /image-processing/process</code> — a direct port of
+  ai-platform's <code>image_analysis.py</code> (a fixed-prompt Qwen Omni vision call; that's genuinely the whole
+  pipeline there for a standalone image, no resize/compress step). Images run concurrently, each with its own
+  Omni latency and token count. An image over Qwen's real per-item size limit (~15 MB) is rejected with a clear
+  error instead of a cryptic provider failure.</p>
+
+  <div class="card">
+    <label for="files">Images</label>
+    <input type="file" id="files" accept="image/*" multiple>
+    <div class="row">
+      <button class="primary" id="process">Process</button>
+    </div>
+  </div>
+
+  <div class="card" id="result" hidden>
+    <div class="meta" id="meta"></div>
+    <div id="err" class="err"></div>
+    <div class="grid" id="grid"></div>
+  </div>
+</main>
+
+<div class="modal-backdrop" id="modalBackdrop" hidden>
+  <div class="modal">
+    <h2 id="modalTitle">Analysis</h2>
+    <pre id="modalText"></pre>
+    <div class="row">
+      <button class="primary" id="modalClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const BASE = location.protocol.startsWith("http") ? "" : "http://localhost:8000";
+  const ROUTE = BASE + "/image-processing/process";
+  const $ = (id) => document.getElementById(id);
+  const files = $("files"), process_ = $("process");
+
+  function el(tag, props = {}, ...kids) {
+    const n = Object.assign(document.createElement(tag), props);
+    n.append(...kids);
+    return n;
+  }
+
+  function fmtSize(bytes) {
+    if (bytes === null || bytes === undefined) return "";
+    return bytes >= 1_000_000 ? (bytes / 1_000_000).toFixed(1) + " MB" : (bytes / 1000).toFixed(0) + " KB";
+  }
+
+  function fmtTokens(usage) {
+    if (!usage) return "";
+    return `${usage.total_tokens} tok`;
+  }
+
+  function errorText(detail, fallback) {
+    return detail ? (typeof detail === "string" ? detail : JSON.stringify(detail)) : (fallback || "Request failed");
+  }
+
+  const modalBackdrop = $("modalBackdrop"), modalTitle = $("modalTitle"), modalText = $("modalText");
+  function openModal(title, text) {
+    modalTitle.textContent = title;
+    modalText.textContent = text;
+    modalBackdrop.hidden = false;
+  }
+  function closeModal() { modalBackdrop.hidden = true; }
+  $("modalClose").addEventListener("click", closeModal);
+  modalBackdrop.addEventListener("click", (e) => { if (e.target === modalBackdrop) closeModal(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !modalBackdrop.hidden) closeModal(); });
+
+  // Client-side thumbnails from the selected Files, matched to results by array index — the
+  // response carries no image bytes back, so the preview comes from what the browser already has.
+  let thumbUrls = [];
+
+  function imageCard(r, i) {
+    const thumb = el("img", { className: "thumb", src: thumbUrls[i] || "", alt: r.filename });
+    const stats = el("div", { className: "stats" },
+      el("span", {}, fmtSize(r.size_bytes)),
+      r.width ? el("span", {}, `${r.width}×${r.height}`) : "",
+      r.latency_ms !== null ? el("span", {}, r.latency_ms + " ms") : "",
+      r.usage ? el("span", {}, fmtTokens(r.usage)) : "",
+    );
+    const body = [el("div", { className: "fname" }, r.filename), stats];
+    if (r.error) {
+      body.push(el("div", { className: "err" }, r.error));
+    } else if (r.text) {
+      body.push(el("div", { className: "preview" }, r.text.slice(0, 220)));
+      const btn = el("button", { className: "text-link", type: "button" }, `View full (${r.text.length} chars)`);
+      btn.addEventListener("click", () => openModal(r.filename, r.text));
+      body.push(btn);
+    } else {
+      body.push(el("div", { className: "hint" }, "(empty)"));
+    }
+    return el("div", { className: "imgcard" }, thumb, el("div", { className: "body" }, ...body));
+  }
+
+  async function run() {
+    if (!files.files.length) { files.focus(); return; }
+
+    process_.disabled = true; process_.textContent = "Processing…";
+    $("result").hidden = false;
+    $("err").textContent = "";
+    $("grid").replaceChildren();
+    $("meta").replaceChildren();
+
+    thumbUrls.forEach((u) => URL.revokeObjectURL(u));
+    thumbUrls = Array.from(files.files).map((f) => URL.createObjectURL(f));
+
+    const fd = new FormData();
+    Array.from(files.files).forEach((f) => fd.append("files", f));
+
+    const start = performance.now();
+    try {
+      const r = await fetch(ROUTE, { method: "POST", body: fd });
+      const ms = Math.round(performance.now() - start);
+      const info = await r.json().catch(() => null);
+      if (!r.ok) {
+        $("err").textContent = errorText(info && info.detail, r.status + " " + r.statusText);
+        $("meta").append(el("span", {}, "Status ", el("b", {}, r.status)));
+        return;
+      }
+
+      $("meta").append(
+        el("span", {}, "Round trip ", el("b", {}, ms + " ms")),
+        el("span", {}, "Server ", el("b", {}, info.latency_ms + " ms")),
+        el("span", {}, "Omni OCR ", el("b", {}, info.omni_latency_ms + " ms"), el("span", { className: "hint" }, ` (slowest ${info.omni_latency_max_ms} ms)`)),
+        el("span", {}, "Images ", el("b", {}, info.image_count)),
+        el("span", {}, "Tokens ", el("b", {}, info.omni_tokens_total ?? 0)),
+      );
+      if (!info.omni_configured) {
+        $("meta").append(el("span", { className: "err" }, `${info.omni_key_env || "Omni API key"} not configured — images will show an error`));
+      }
+
+      const grid = $("grid");
+      (info.images || []).forEach((r, i) => grid.append(imageCard(r, i)));
+    } catch (e) {
+      $("err").textContent = String(e);
+    } finally {
+      process_.disabled = false; process_.textContent = "Process";
+    }
+  }
+
+  process_.addEventListener("click", run);
+</script>
+</body>
+</html>
