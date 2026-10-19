@@ -1,31 +1,25 @@
-"""POST /video-processing/process: a preprocessing pipeline for long video/audio, distinct from
-video_splitter.py's lossless stream-copy splitter. Where that one keeps parts lossless for
-download, this one is built for feeding Qwen Omni: validates a duration cap, scales video down to
-720p and re-encodes while splitting, splits audio-only input with stream copy when possible, runs
-every chunk through Omni, then restores a single original timeline by shifting each chunk's
-[MM:SS] markers by its own real start time.
+"""POST /video-processing/process: a preprocessing pipeline for long video/audio, built for
+feeding Qwen Omni: validates a duration cap, scales video down to 720p and re-encodes while
+splitting, splits audio-only input with stream copy when possible, runs every chunk through Omni,
+then restores a single original timeline by shifting each chunk's [MM:SS] markers by its own real
+start time.
 
 Latency: the chunk re-encode keeps original fps (720p-capped) because it's also what the ZIP
 hands back to the user to watch — dropping fps there would make the download a slideshow. Before
 a video chunk is actually sent to Omni, a SEPARATE 2fps/720p copy is made just for that call via
-video_splitter's _reduce_for_omni — the zipped chunk a person downloads is never fps-reduced.
+utils.py's _reduce_for_omni — the zipped chunk a person downloads is never fps-reduced.
 
 Video chunks are cut ONE AT A TIME (not via ffmpeg's segment muxer, which only hands back
 completed chunks after processing the ENTIRE file) specifically so cutting and Omni can overlap:
 chunk 1 starts its Omni call as soon as it's cut, while chunk 2 is still being cut, instead of
 waiting for every chunk to exist before any Omni call begins. Re-encoding (not stream copy) means
-each cut is frame-accurate regardless of keyframes, so this needs none of video_splitter.py's
-keyframe-snapping machinery. Cutting itself is still capped at CUT_CONCURRENCY concurrent ffmpeg
-processes (CPU-bound, unlike the I/O-bound Omni calls) to avoid oversubscribing the machine, but
-that cap matters more than it looks: a chunk queued behind others for a cut slot has its Omni
-call delayed too, and if that chunk also happens to have a long Omni call, the queueing delay
-lands on the critical path. See CUT_CONCURRENCY's own comment. Audio-only input keeps the simpler
-segment-muxer+stream-copy batch approach: it's already fast (no re-encode), so there's no
-meaningful split phase to overlap with anything."""
+each cut is frame-accurate regardless of keyframes, so this needs no keyframe-snapping machinery.
+Cutting runs fully concurrently across every chunk (no cap on simultaneous ffmpeg processes) —
+Audio-only input keeps the simpler segment-muxer+stream-copy batch approach: it's already fast
+(no re-encode), so there's no meaningful split phase to overlap with anything."""
 import asyncio
 import base64
 import math
-import os
 import re
 import tempfile
 import time
@@ -37,9 +31,9 @@ import imageio_ffmpeg
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 import omni_video
-from video_splitter import OMNI_COMPRESS_TARGET_MB, OMNI_MAX_BYTES
-from video_splitter import _compress_for_omni as _compress_video_for_omni
-from video_splitter import _reduce_for_omni as _reduce_video_for_omni
+from utils import OMNI_COMPRESS_TARGET_MB, OMNI_MAX_BYTES
+from utils import _compress_for_omni as _compress_video_for_omni
+from utils import _reduce_for_omni as _reduce_video_for_omni
 
 router = APIRouter()
 
@@ -51,25 +45,11 @@ TIMESTAMP_RE = re.compile(r"\[(\d{1,3}):(\d{2})(?:[–-](\d{1,3}):(\d{2}))?\]")
 
 MAX_DURATION_SECONDS = 30 * 60  # reject anything longer before spending time processing it
 DEFAULT_SEGMENT_SECONDS = 180
-# Concurrent ffmpeg re-encodes — CPU-bound, unlike the Omni calls alongside them. Verified both
-# failure modes on a real 5-chunk file before settling here:
-#   - Too low (originally 2): a chunk's cut can queue behind two earlier ones even though
-#     cutting (12-37s observed) is far cheaper than the Omni wait after it (31-161s observed) —
-#     if that queued chunk also has a long Omni call, the queueing delay lands on the critical
-#     path.
-#   - Too high (tried letting all 5 chunks cut at once): every cut measurably slowed down from
-#     CPU contention (a uniform ~32s each, vs. the staggered 13-37s at a lower cap) — confirming
-#     re-encoding really is CPU-bound enough to oversubscribe.
-# 4 is a middle ground, not a formally tuned optimum — Omni's own response time varies by 30-60%+
-# between otherwise-identical calls (confirmed: the SAME chunk took 160.6s in one run and 210.5s
-# in another), which dominates total latency more than this cap does. Don't over-index on this
-# number without more trials than are practical to run here.
-CUT_CONCURRENCY = min(4, os.cpu_count() or 4)
-# OMNI_MAX_BYTES/OMNI_COMPRESS_TARGET_MB and the video compressor are imported from
-# video_splitter.py rather than re-derived — it already found DashScope's real "max bytes per
-# data-uri item" limit empirically (see its own comment on OMNI_MAX_BYTES) and a proven two-pass,
-# fps/resolution-capped compressor to fit under it. A 720p/crf28 chunk from this pipeline's own
-# split step rarely hits that limit, but a long or high-motion segment still can.
+# OMNI_MAX_BYTES/OMNI_COMPRESS_TARGET_MB and the video compressor are imported from utils.py
+# rather than re-derived — it already found DashScope's real "max bytes per data-uri item" limit
+# empirically (see its own comment on OMNI_MAX_BYTES) and a proven two-pass, fps/resolution-capped
+# compressor to fit under it. A 720p/crf28 chunk from this pipeline's own split step rarely hits
+# that limit, but a long or high-motion segment still can.
 
 
 async def _run_ffmpeg(args: list[str]) -> tuple[int, str]:
@@ -114,8 +94,8 @@ def _parse_segment_list(list_path: Path, tmp_dir: Path) -> list[tuple[Path, floa
 
 def _plan_video_segments(duration: float, segment_seconds: int) -> list[tuple[float, float]]:
     """Equal-ish segment_seconds-wide boundaries, last one taking the remainder. No keyframe
-    snapping needed here (unlike video_splitter.py): these chunks are re-encoded, not
-    stream-copied, so ffmpeg cuts exactly where asked regardless of the source's keyframes."""
+    snapping needed: these chunks are re-encoded, not stream-copied, so ffmpeg cuts exactly
+    where asked regardless of the source's keyframes."""
     bounds = []
     t = 0.0
     while t < duration:
@@ -183,8 +163,8 @@ def _shift_timestamps(text: str, offset: float) -> str:
 
 async def _compress_audio_for_omni(path: Path, duration: float, tmp_dir: Path, target_mb: float) -> Path:
     """Re-encodes an oversized audio chunk down to roughly target_mb. Audio has no fps/resolution
-    to cut, so this is just a bitrate-targeted re-encode (mirrors video_splitter's bitrate math,
-    minus the video-specific knobs)."""
+    to cut, so this is just a bitrate-targeted re-encode (mirrors utils.py's video compressor's
+    bitrate math, minus the video-specific knobs)."""
     bitrate = max(int(target_mb * 1_000_000 * 8 / duration * 0.94), 32_000)
     out_path = tmp_dir / f"{path.stem}_compressed.mp3"
     args = ["-y", "-i", str(path), "-c:a", "libmp3lame", "-b:a", str(bitrate), str(out_path)]
@@ -198,14 +178,14 @@ async def _process_chunk(
     path: Path, start: float, end: float, kind: str, audio_format: str, tmp_dir: Path,
 ) -> tuple[str | None, str | None, dict | None, int | None]:
     """Returns (text, error, usage, omni_latency_ms) — exactly one of text/error is set. Never
-    raises: one bad chunk shouldn't fail the whole file (same fail-open rule video_splitter.py's
-    _transcribe uses). usage/latency are None on error.
+    raises: one bad chunk shouldn't fail the whole file (same fail-open rule every Omni-backed
+    section in this playground uses). usage/latency are None on error.
 
     Video chunks are always run through _reduce_video_for_omni first — fewer frames for Omni to
     analyze, not just a smaller file (see this module's docstring) — before the size check, so a
     chunk over Qwen's real size limit (OMNI_MAX_BYTES) almost never needs the heavier two-pass
     compressor below; when it still does, that's retried at a lower target if a hard-to-compress
-    chunk overshoots, same pattern video_splitter.py's _transcribe uses."""
+    chunk overshoots."""
     send_path, send_audio_format = path, audio_format
     original_mb = path.stat().st_size / 1_000_000
 
@@ -246,18 +226,16 @@ async def _process_chunk(
 
 
 async def _cut_and_process_video_chunk(
-    sem: asyncio.Semaphore, input_path: Path, i: int, start: float, end: float,
+    input_path: Path, i: int, start: float, end: float,
     tmp_dir: Path, do_process: bool,
 ) -> tuple[Path, float, float, str | None, str | None, dict | None, int | None, int]:
-    """Cuts one video chunk (capped at CUT_CONCURRENCY concurrent ffmpeg processes), then
-    immediately starts its Omni call — so when this runs alongside other chunks via
-    asyncio.gather, chunk 1's Omni call overlaps with chunk 2 (or 3, 4...) still being cut,
-    instead of every chunk waiting for the whole file to finish splitting first. Returns
-    (out_path, start, end, text, error, usage, omni_latency_ms, cut_latency_ms)."""
+    """Cuts one video chunk, then immediately starts its Omni call — so when this runs alongside
+    other chunks via asyncio.gather, chunk 1's Omni call overlaps with chunk 2 (or 3, 4...) still
+    being cut, instead of every chunk waiting for the whole file to finish splitting first.
+    Returns (out_path, start, end, text, error, usage, omni_latency_ms, cut_latency_ms)."""
     out_path = tmp_dir / f"chunk_{i:03d}.mp4"
     cut_start = time.perf_counter()
-    async with sem:
-        await _cut_video_chunk(input_path, start, end, out_path)
+    await _cut_video_chunk(input_path, start, end, out_path)
     cut_latency_ms = round((time.perf_counter() - cut_start) * 1000)
 
     if do_process:
@@ -306,9 +284,8 @@ async def process_video(
         process_start = time.perf_counter()
         if kind == "video":
             segments = _plan_video_segments(info["duration"], segment_seconds)
-            sem = asyncio.Semaphore(CUT_CONCURRENCY)
             raw = await asyncio.gather(*(
-                _cut_and_process_video_chunk(sem, input_path, i, start, end, tmp_dir, do_process)
+                _cut_and_process_video_chunk(input_path, i, start, end, tmp_dir, do_process)
                 for i, (start, end) in enumerate(segments, start=1)
             ))
             chunks = [(p, s, e) for p, s, e, *_ in raw]

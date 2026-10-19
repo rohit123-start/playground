@@ -9,9 +9,9 @@ step for a direct image upload in ai-platform, so this doesn't invent one either
 What this section adds beyond a single analyze_image() call: support for MULTIPLE images in one
 request, run concurrently (asyncio.gather) with each image's own Omni latency/tokens tracked —
 the same pattern already established for every other Omni-backed playground section — plus a
-size guard against the same real Qwen Omni per-item limit video_splitter.py found empirically
-(OMNI_MAX_BYTES), since ai-platform's own images are small document-embedded ones and never hit
-it, but an arbitrary direct upload here easily could."""
+size guard against the real Qwen Omni per-item limit found empirically (OMNI_MAX_BYTES, in
+utils.py), since ai-platform's own images are small document-embedded ones and never hit it, but
+an arbitrary direct upload here easily could."""
 import asyncio
 import io
 import time
@@ -21,7 +21,7 @@ from PIL import Image as PILImage
 
 import omni_video
 from file_processing import IMAGE_EXTS, _ext
-from video_splitter import OMNI_MAX_BYTES
+from utils import OMNI_MAX_BYTES
 
 router = APIRouter()
 

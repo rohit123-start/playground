@@ -59,7 +59,6 @@ OCR_RENDER_SCALE = 2.0  # 144 DPI — ai-platform's tuned value; 200 DPI is a re
 # point in general, but this is the reference's own verified setting, not a guess.
 MAX_OCR_PAGES = 30
 MAX_EMBEDDED_IMAGES = 30
-OCR_CONCURRENCY = 4
 
 
 def _ext(filename: str | None) -> str:
@@ -204,34 +203,31 @@ def _read_pdf(data: bytes) -> list[tuple[int, str, bytes | None, list[tuple[byte
     return pages
 
 
-async def _ocr_page(sem: asyncio.Semaphore, calls: list[OmniCall], number: int, png: bytes) -> str:
-    async with sem:
-        try:
-            text, usage, latency_ms = await omni_video.transcribe_page(png, mime="image/png")
-            calls.append(OmniCall("page", f"page {number}", latency_ms, usage, None))
-            return text
-        except omni_video.OmniError as err:
-            calls.append(OmniCall("page", f"page {number}", None, None, str(err)))
-            return ""
+async def _ocr_page(calls: list[OmniCall], number: int, png: bytes) -> str:
+    try:
+        text, usage, latency_ms = await omni_video.transcribe_page(png, mime="image/png")
+        calls.append(OmniCall("page", f"page {number}", latency_ms, usage, None))
+        return text
+    except omni_video.OmniError as err:
+        calls.append(OmniCall("page", f"page {number}", None, None, str(err)))
+        return ""
 
 
-async def _analyze_embedded(sem: asyncio.Semaphore, calls: list[OmniCall], label: str, blob: bytes, mime: str) -> str:
-    async with sem:
-        try:
-            text, usage, latency_ms = await omni_video.analyze_image(blob, mime=mime)
-            calls.append(OmniCall("image", label, latency_ms, usage, None))
-            return text
-        except omni_video.OmniError as err:
-            calls.append(OmniCall("image", label, None, None, str(err)))
-            return ""
+async def _analyze_embedded(calls: list[OmniCall], label: str, blob: bytes, mime: str) -> str:
+    try:
+        text, usage, latency_ms = await omni_video.analyze_image(blob, mime=mime)
+        calls.append(OmniCall("image", label, latency_ms, usage, None))
+        return text
+    except omni_video.OmniError as err:
+        calls.append(OmniCall("image", label, None, None, str(err)))
+        return ""
 
 
 async def _extract_pdf(data: bytes, calls: list[OmniCall]) -> list[Unit]:
     pdf_pages = await asyncio.to_thread(_read_pdf, data)
-    sem = asyncio.Semaphore(OCR_CONCURRENCY)
 
     scanned = [(n, png) for n, _t, png, _imgs in pdf_pages if png][:MAX_OCR_PAGES]
-    ocr_texts = await asyncio.gather(*(_ocr_page(sem, calls, n, png) for n, png in scanned))
+    ocr_texts = await asyncio.gather(*(_ocr_page(calls, n, png) for n, png in scanned))
     ocr = {n: t for (n, _png), t in zip(scanned, ocr_texts)}
 
     img_jobs = [
@@ -240,7 +236,7 @@ async def _extract_pdf(data: bytes, calls: list[OmniCall]) -> list[Unit]:
         for j, (img, ext) in enumerate(imgs, start=1)
     ][:MAX_EMBEDDED_IMAGES]
     analyzed = await asyncio.gather(*(
-        _analyze_embedded(sem, calls, f"image {j} on page {n}", img, mime) for n, j, img, mime in img_jobs
+        _analyze_embedded(calls, f"image {j} on page {n}", img, mime) for n, j, img, mime in img_jobs
     ))
     image_notes: dict[int, list[str]] = {}
     for (n, j, _img, _mime), analysis in zip(img_jobs, analyzed):
@@ -260,7 +256,6 @@ async def _extract_pdf(data: bytes, calls: list[OmniCall]) -> list[Unit]:
 async def _extract_pptx(data: bytes, calls: list[OmniCall]) -> list[Unit]:
     prs = Presentation(io.BytesIO(data))
     slide_area = prs.slide_width * prs.slide_height
-    sem = asyncio.Semaphore(OCR_CONCURRENCY)
     units: list[Unit] = []
 
     for i, slide in enumerate(prs.slides, start=1):
@@ -284,7 +279,7 @@ async def _extract_pptx(data: bytes, calls: list[OmniCall]) -> list[Unit]:
             image_jobs = image_jobs[:MAX_EMBEDDED_IMAGES]
 
             analyzed = await asyncio.gather(*(
-                _analyze_embedded(sem, calls, f"image {j} on slide {i}", blob, mime)
+                _analyze_embedded(calls, f"image {j} on slide {i}", blob, mime)
                 for j, (blob, mime) in enumerate(image_jobs, start=1)
             ))
             notes = [f"[Image {j} on slide {i}]\n{a}" for j, a in enumerate(analyzed, start=1) if a.strip()]
@@ -311,9 +306,8 @@ async def _extract_docx(data: bytes, calls: list[OmniCall]) -> list[Unit]:
             image_jobs.append((blob, rel.target_part.content_type))
     image_jobs = image_jobs[:MAX_EMBEDDED_IMAGES]
 
-    sem = asyncio.Semaphore(OCR_CONCURRENCY)
     analyzed = await asyncio.gather(*(
-        _analyze_embedded(sem, calls, f"image {j}", blob, mime)
+        _analyze_embedded(calls, f"image {j}", blob, mime)
         for j, (blob, mime) in enumerate(image_jobs, start=1)
     ))
     notes = [f"[Image {j}]\n{a}" for j, a in enumerate(analyzed, start=1) if a.strip()]
@@ -323,7 +317,6 @@ async def _extract_docx(data: bytes, calls: list[OmniCall]) -> list[Unit]:
 
 async def _extract_xlsx(data: bytes, calls: list[OmniCall]) -> list[Unit]:
     wb = load_workbook(io.BytesIO(data), data_only=True, read_only=False)
-    sem = asyncio.Semaphore(OCR_CONCURRENCY)
     units: list[Unit] = []
 
     for i, ws in enumerate(wb.worksheets, start=1):
@@ -348,7 +341,7 @@ async def _extract_xlsx(data: bytes, calls: list[OmniCall]) -> list[Unit]:
             image_jobs = image_jobs[:MAX_EMBEDDED_IMAGES]
 
             analyzed = await asyncio.gather(*(
-                _analyze_embedded(sem, calls, f"image {j} on sheet {ws.title}", blob, _image_mime(blob))
+                _analyze_embedded(calls, f"image {j} on sheet {ws.title}", blob, _image_mime(blob))
                 for j, blob in enumerate(image_jobs, start=1)
             ))
             notes = [f"[Image {j} on sheet {ws.title}]\n{a}" for j, a in enumerate(analyzed, start=1) if a.strip()]

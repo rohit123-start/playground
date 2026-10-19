@@ -6,15 +6,15 @@ image/video — "standalone media has no text fallback").
 Unlike image_processing.py though, audio commonly exceeds Omni's real per-item size limit just
 from running a few minutes long — far more likely than for a single photo — so this reuses
 video_processing.py's bitrate-targeted audio compressor as a retry-on-oversize safety net (same
-pattern video_splitter.py / video_processing.py already use for their own oversized chunks),
-rather than just rejecting the file outright the way image_processing.py does for images, where
-hitting that limit is rare enough that a clear error beats the added complexity.
+pattern video_processing.py already uses for its own oversized chunks), rather than just
+rejecting the file outright the way image_processing.py does for images, where hitting that
+limit is rare enough that a clear error beats the added complexity.
 
-AUDIO_MAX_BYTES is calibrated separately from video_splitter.py's OMNI_MAX_BYTES (~15 MB, for
-video/image): live testing against the real OpenRouter/Qwen endpoint found audio starts failing
-with "the audio is empty" once its base64 payload crosses 8 MiB (confirmed by bisection — 8,385,432
-b64 bytes succeeded, 8,428,344 failed, bracketing the 8*1024*1024 boundary), giving a raw-byte
-ceiling of 6,291,456 — well under the video/image limit, so audio needs its own constant.
+AUDIO_MAX_BYTES is calibrated separately from utils.py's OMNI_MAX_BYTES (~15 MB, for video/image):
+live testing against the real OpenRouter/Qwen endpoint found audio starts failing with "the audio
+is empty" once its base64 payload crosses 8 MiB (confirmed by bisection — 8,385,432 b64 bytes
+succeeded, 8,428,344 failed, bracketing the 8*1024*1024 boundary), giving a raw-byte ceiling of
+6,291,456 — well under the video/image limit, so audio needs its own constant.
 
 Supports multiple audio files per request, run concurrently, each with its own Omni
 latency/tokens tracked — the pattern already established for every other Omni-backed section."""
