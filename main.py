@@ -7,7 +7,6 @@ import audio_processing
 import file_processing
 import image_processing
 import jev_ai
-import jev_memory_llm
 import jev_model_picker
 import jev_prompt_scan
 import jev_tool_model_routing
@@ -27,7 +26,6 @@ def _page(name: str) -> FileResponse:
 app = FastAPI(title="Tool Selector")
 app.include_router(jev_ai.router)  # POST /jev-open-router-tool
 app.include_router(jev_prompt_scan.router)  # POST /jev-prompt-scan-open-router
-app.include_router(jev_memory_llm.router)  # POST /memory-llm
 app.include_router(jev_model_picker.router)  # POST /jev-model-picker-{low,medium,high}
 app.include_router(jev_tool_model_routing.router)  # POST /jev-tool-model-routing
 app.include_router(video_processing.router)  # POST /video-processing/process
@@ -44,11 +42,6 @@ async def playground_tool():
 @app.get("/playground/prompt-scan", include_in_schema=False)
 async def playground_prompt_scan():
     return _page("playground_prompt_scan.html")
-
-
-@app.get("/playground/memory-llm", include_in_schema=False)
-async def playground_memory_llm():
-    return _page("playground_memory_llm.html")
 
 
 @app.get("/playground/model-picker", include_in_schema=False)
