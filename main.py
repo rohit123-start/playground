@@ -10,6 +10,7 @@ import jev_ai
 import jev_memory_llm
 import jev_model_picker
 import jev_prompt_scan
+import jev_token_count
 import jev_tool_model_routing
 import video_processing
 
@@ -29,6 +30,7 @@ app.include_router(jev_ai.router)  # POST /jev-open-router-tool
 app.include_router(jev_prompt_scan.router)  # POST /jev-prompt-scan-open-router
 app.include_router(jev_memory_llm.router)  # POST /memory-llm
 app.include_router(jev_model_picker.router)  # POST /jev-model-picker-{low,medium,high}
+app.include_router(jev_token_count.router)  # POST /token-count
 app.include_router(jev_tool_model_routing.router)  # POST /jev-tool-model-routing
 app.include_router(video_processing.router)  # POST /video-processing/process
 app.include_router(file_processing.router)  # POST /file-processing/process
@@ -54,6 +56,11 @@ async def playground_memory_llm():
 @app.get("/playground/model-picker", include_in_schema=False)
 async def playground_model_picker():
     return _page("playground_model_picker.html")
+
+
+@app.get("/playground/token-count", include_in_schema=False)
+async def playground_token_count():
+    return _page("playground_token_count.html")
 
 
 @app.get("/playground/tool-model-routing", include_in_schema=False)
