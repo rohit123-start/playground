@@ -1,8 +1,7 @@
 """POST /memory-llm: a free-form chat-completion call to the memory pipeline's own model
-(openai/gpt-5.6-luna, via OpenRouter — same model ai-platform's app/rag/extraction.py hardcodes
-as MEMORY_EXTRACTOR_MODEL), for trying out system-prompt wording without touching the real
-extractor or its DB writes. Non-streaming, single call, no history, no separate user message:
-the system prompt alone is the whole request."""
+(openai/gpt-6-luna, via OpenRouter), for trying out system-prompt wording without touching the
+real extractor or its DB writes. Non-streaming, single call, no history, no separate user
+message: the system prompt alone is the whole request."""
 import os
 import time
 
@@ -17,7 +16,7 @@ router = APIRouter()
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_API_KEY = os.getenv("OPEN_ROUTER_API_KEY")
-MEMORY_LLM_MODEL = os.getenv("MEMORY_LLM_MODEL", "openai/gpt-5.6-luna")
+MEMORY_LLM_MODEL = os.getenv("MEMORY_LLM_MODEL", "openai/gpt-6-luna")
 
 _client: AsyncOpenAI | None = None
 
