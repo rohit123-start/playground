@@ -38,6 +38,11 @@
   .meta b { color: var(--text); }
   .tokens { font-size: 40px; font-weight: 700; line-height: 1.1; margin: 4px 0 2px; }
   .err { color: var(--bad); white-space: pre-wrap; word-break: break-word; }
+  pre { margin: 0; padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+        overflow: auto; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+  .preview-label { font-weight: 600; margin: 14px 0 6px; }
+  .preview-label:first-child { margin-top: 0; }
+  .preview-sep { color: var(--muted); text-align: center; margin: 6px 0; font-size: 13px; }
   .nav { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
   .nav a { border: 1px solid var(--line); color: var(--text); border-radius: 999px; padding: 4px 14px;
            font-size: 13px; text-decoration: none; }
@@ -83,6 +88,13 @@
   <div class="card" id="result" hidden>
     <div class="tokens" id="tokens"></div>
     <div class="meta" id="meta"></div>
+    <div id="preview" hidden>
+      <div class="preview-label">First 300 tokens</div>
+      <pre id="preview-first"></pre>
+      <div class="preview-sep">&hellip; omitted &hellip;</div>
+      <div class="preview-label">Last 100 tokens</div>
+      <pre id="preview-last"></pre>
+    </div>
   </div>
 
   <div class="card" id="err-card" hidden>
@@ -141,6 +153,11 @@
         el("span", {}, "Encoding ", el("b", {}, body.encoding)),
         el("span", {}, "Characters ", el("b", {}, text.length.toLocaleString())),
       );
+      $("preview").hidden = !body.truncated;
+      if (body.truncated) {
+        $("preview-first").textContent = body.preview_first || "";
+        $("preview-last").textContent = body.preview_last || "";
+      }
     } else {
       $("result").hidden = true;
       $("err-card").hidden = false;

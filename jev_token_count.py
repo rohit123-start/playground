@@ -49,6 +49,15 @@ def _encoding_for(model: str) -> "tiktoken.Encoding":
     return _encoders[model]
 
 
+# Above this many tokens, the response carries a preview (first/last slice) instead of
+# echoing the whole prompt back — the prompt is already in the textarea the caller just
+# typed it into; the preview is for seeing exactly where the encoder's token boundaries
+# fall, not for re-displaying arbitrarily long text.
+PREVIEW_THRESHOLD = 400
+PREVIEW_FIRST = 300
+PREVIEW_LAST = 100
+
+
 class TokenCountRequest(BaseModel):
     prompt: str
     model: str = "gpt-4o"
@@ -58,6 +67,9 @@ class TokenCountResponse(BaseModel):
     tokens: int
     model: str
     encoding: str
+    truncated: bool
+    preview_first: "str | None" = None
+    preview_last: "str | None" = None
 
 
 @router.post("/token-count", response_model=TokenCountResponse)
@@ -65,4 +77,11 @@ async def token_count(req: TokenCountRequest) -> TokenCountResponse:
     if not req.prompt.strip():
         raise HTTPException(status_code=422, detail="prompt must not be empty")
     enc = _encoding_for(req.model)
-    return TokenCountResponse(tokens=len(enc.encode(req.prompt)), model=req.model, encoding=enc.name)
+    ids = enc.encode(req.prompt)
+    truncated = len(ids) > PREVIEW_THRESHOLD
+    preview_first = enc.decode(ids[:PREVIEW_FIRST]) if truncated else None
+    preview_last = enc.decode(ids[-PREVIEW_LAST:]) if truncated else None
+    return TokenCountResponse(
+        tokens=len(ids), model=req.model, encoding=enc.name,
+        truncated=truncated, preview_first=preview_first, preview_last=preview_last,
+    )
