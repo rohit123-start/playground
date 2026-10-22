@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Query Rewriter Playground</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --text: #1c1c1a; --muted: #6b6b66; --line: #e2e2dd;
+    --accent: #2f5fd0; --accent-text: #ffffff; --good: #1f7a45; --bad: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --card: #1e1e1c; --text: #ecece8; --muted: #9a9a93; --line: #34342f;
+      --accent: #6c93f0; --accent-text: #10131a; --good: #5fd08a; --bad: #f2877f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; font-weight: 600; margin-bottom: 8px; }
+  .hint-label { font-weight: 400; color: var(--muted); font-size: 13px; }
+  textarea { width: 100%; min-height: 84px; resize: vertical; padding: 10px 12px; font: inherit;
+             color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  [hidden] { display: none !important; }
+  .row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+  button.primary { background: var(--accent); color: var(--accent-text); border: 0; border-radius: 8px;
+                   padding: 9px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.primary:disabled { opacity: .6; cursor: default; }
+  .hint { color: var(--muted); font-size: 13px; }
+  .meta { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+  .meta b { color: var(--text); }
+  .err { color: var(--bad); white-space: pre-wrap; word-break: break-word; }
+  pre { margin: 0; padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+        overflow: auto; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+  .nav { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+  .nav a { border: 1px solid var(--line); color: var(--text); border-radius: 999px; padding: 4px 14px;
+           font-size: 13px; text-decoration: none; }
+  .nav a[aria-current="page"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <nav class="nav">
+    <a href="/playground">Tool selection</a>
+    <a href="/playground/prompt-scan">Prompt scan (JEV)</a>
+    <a href="/playground/memory-llm">Memory LLM</a>
+    <a href="/playground/model-picker">Model picker (JEV)</a>
+    <a href="/playground/tool-model-routing">Tool model routing (JEV)</a>
+    <a href="/playground/token-count">Token count</a>
+    <a href="/playground/embeddings">Embeddings</a>
+    <a href="/playground/video-processing">Video processing</a>
+    <a href="/playground/file-processing">File processing</a>
+    <a href="/playground/image-processing">Image processing</a>
+    <a href="/playground/audio-processing">Audio processing</a>
+    <a href="/playground/summary-updater">Summary updater</a>
+    <a href="/playground/query-rewriter" aria-current="page">Query rewriter</a>
+  </nav>
+  <h1>Query Rewriter Playground</h1>
+  <p class="sub">Sends a system prompt straight to <code>POST /query-rewriter</code>, a plain non-streaming chat-completion call on <code>openai/gpt-6-luna</code> via OpenRouter. No user message, no history, no DB writes: just the raw reply.</p>
+
+  <div class="card">
+    <label for="sys">System prompt</label>
+    <textarea id="sys" placeholder="e.g. You convert a user's raw message into 4 structured queries...&#10;(dynamic &mdash; edit freely and resend)" style="min-height:420px"></textarea>
+    <div class="row">
+      <button class="primary" id="send">Send</button>
+      <span class="hint">Ctrl/Cmd + Enter to send</span>
+    </div>
+  </div>
+
+  <div class="card" id="result" hidden>
+    <div class="meta" id="meta"></div>
+    <div id="out"></div>
+  </div>
+
+  <div class="card" id="history-card" hidden>
+    <label>History</label>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr>
+        <th style="text-align:left;padding:6px 8px">System prompt</th>
+        <th style="text-align:left;padding:6px 8px">Result</th>
+        <th style="text-align:left;padding:6px 8px">Latency</th>
+      </tr></thead>
+      <tbody id="history"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+  // Relative URLs only parse when served over http(s); fall back to the local server if opened as a file.
+  const BASE = location.protocol.startsWith("http") ? "" : "http://localhost:8000";
+  const ROUTE = "/query-rewriter";
+  const $ = (id) => document.getElementById(id);
+  const sys = $("sys"), send = $("send");
+
+  sys.value = `You convert a user's raw message into 4 structured queries for semantic retrieval over older conversation messages and saved memory. You do not answer the user. You only produce the queries.
+
+INPUTS
+- latest_message: the user's current message
+- recent_turns: the last few turns (context only). Always provided; an empty list means there are no earlier turns.
+
+THE 4 QUERIES
+Always output exactly 4, each standalone and meaningfully different from the others:
+1. Direct: the user's request restated as a specific, standalone statement of what to find.
+2. Keywords: a compact string of the most distinctive terms likely to appear in the target text (entities, feature names, technical terms). No full sentence.
+3. Paraphrase: the same target in different wording, using synonyms or how the original discussion might have phrased it.
+4. Context: the broader topic or decision area around the target, to catch related messages the user didn't name directly.
+
+RULES
+1. Every query must make sense with no other context.
+2. If latest_message names its subject, stay close to the user's wording in query 1. Add context only in queries 3 and 4, and only from what the user said.
+3. If the subject is missing ("it", "that", "the other one", "same as before", a bare "yes"), resolve it using recent_turns and replace each reference with the actual named subject in all 4 queries. Never guess.
+4. Preserve exact proper nouns, product names (e.g. Zeach, Zhat), feature names, numbers, and technical terms. Never translate, expand, or rename them.
+5. Describe the target, not the answer. Good: "decision on routing fallback behavior for Zhat". Bad: "the fallback should use the default model".
+6. Do not invent facts, entities, dates, or constraints that are not in the message or recent_turns.
+7. Do not fold the task instruction into the queries. Retrieve the information needed for the task, not the task itself ("redo the pricing table" becomes "pricing table values and pricing decisions").
+8. If the message has several unrelated subjects (max 3), keep the 4 queries but cover every subject across them. Do not drop a subject.
+9. Write queries in the user's language, but keep proper nouns unchanged.
+10. Each query is one line, under 30 words. No two queries may be identical or differ only by punctuation.
+
+DECIDING position_hint
+Set it only if the message contains a cue about WHERE in the conversation to look, not WHAT to look for.
+- Cue types: start / beginning / first, earlier / before / previously, today / yesterday / last week, "N messages ago", "the last thing you said".
+- If the message has a topic AND a cue, put the cue in position_hint and the topic in the queries.
+- Keep the cue out of the queries; positional words hurt semantic matching.
+- If no cue is present, use null. Never infer a position from tone or context.
+
+DECIDING needs_clarification
+Step 1: Does latest_message name a specific subject? If yes, false.
+Step 2: If not, does recent_turns clearly identify exactly one subject (or one clear pair of subjects)? If yes, resolve it in all 4 queries and set false.
+Step 3: If recent_turns is empty, or points to two or more possible subjects with no way to choose, set true and still write 4 best-effort short phrases.
+
+OUTPUT
+Return only valid JSON, no prose, no markdown fences:
+
+{
+  "queries": ["<direct>", "<keywords>", "<paraphrase>", "<context>"],
+  "entities": ["<named products, features, people, files>"],
+  "position_hint": "<string or null>",
+  "needs_clarification": false
+}
+
+EXAMPLES
+
+latest_message: "what did we decide about the routing fallback in Zhat?"
+recent_turns: []
+{"queries":["decision on routing fallback behavior in Zhat","Zhat routing fallback default model decision","what was agreed for Zhat when the router cannot pick a specific model","Zhat routing pipeline design and model selection rules"],"entities":["Zhat"],"position_hint":null,"needs_clarification":false}
+
+latest_message: "ok do the same for the other one"
+recent_turns: assistant just rewrote the Zeach onboarding copy; user previously mentioned the Zhat onboarding copy.
+{"queries":["Zhat onboarding copy and the style used for the Zeach onboarding rewrite","Zhat Zeach onboarding copy rewrite tone","Zhat first-run screen text, matching the Zeach onboarding rewrite","onboarding messaging and voice guidelines for Zeach and Zhat"],"entities":["Zeach","Zhat"],"position_hint":null,"needs_clarification":false}
+
+latest_message: "what was your first answer?"
+recent_turns: []
+{"queries":["assistant's first answer in this conversation","first assistant response","opening reply given to the user at the start of this chat","initial question and answer in this conversation"],"entities":[],"position_hint":"start of conversation","needs_clarification":false}
+
+latest_message: "what we said about pricing at the start"
+recent_turns: []
+{"queries":["what was said about pricing","pricing decision discussion","how pricing was described and agreed","pricing model, tiers and cost decisions"],"entities":[],"position_hint":"at the start of the conversation","needs_clarification":false}
+
+latest_message: "yes"
+recent_turns: assistant proposed adding a fallback to the default model when the Zhat router returns no match.
+{"queries":["Zhat router fallback to the default model when no match is found","Zhat router fallback default model no match","using the default model when Zhat routing cannot select a specific model","Zhat routing rules and fallback behavior"],"entities":["Zhat"],"position_hint":null,"needs_clarification":false}
+
+latest_message: "yes"
+recent_turns: []
+{"queries":["user confirmation with no stated subject","confirmation yes","affirmative reply to an earlier proposal","most recent proposal awaiting approval"],"entities":[],"position_hint":null,"needs_clarification":true}
+
+latest_message: "same as before but shorter"
+recent_turns: []
+{"queries":["previous output the user wants shortened","previous output shorter version","earlier response to condense","most recent generated content"],"entities":[],"position_hint":null,"needs_clarification":true}
+
+---
+
+latest_message: ""
+recent_turns: []`;
+
+  function el(tag, props = {}, ...kids) {
+    const n = Object.assign(document.createElement(tag), props);
+    n.append(...kids);
+    return n;
+  }
+
+  function errorText(body, errText) {
+    const d = body && body.detail;
+    return d ? (typeof d === "string" ? d : JSON.stringify(d)) : (errText || "Request failed");
+  }
+
+  async function run() {
+    const systemPrompt = sys.value.trim();
+    if (!systemPrompt) { sys.focus(); return; }
+    send.disabled = true; send.textContent = "Sending…";
+    const start = performance.now();
+    let status = 0, body = null, errText = null;
+    try {
+      const r = await fetch(BASE + ROUTE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ system_prompt: systemPrompt }),
+      });
+      status = r.status;
+      const raw = await r.text();
+      try { body = JSON.parse(raw); } catch { errText = raw; }
+    } catch (e) {
+      errText = String(e);
+    }
+    const ms = Math.round(performance.now() - start);
+    $("result").hidden = false;
+    const ok = status === 200 && body && typeof body.result === "string";
+    const meta = [el("span", {}, "Status ", el("b", {}, status || "network error")),
+                  el("span", {}, "Round trip ", el("b", {}, ms + " ms"))];
+    if (ok) {
+      meta.push(el("span", {}, "Model ", el("b", {}, body.model)));
+      meta.push(el("span", {}, "Server ", el("b", {}, body.latency_ms + " ms")));
+    }
+    $("meta").replaceChildren(...meta);
+    const out = $("out");
+    let label;
+    if (!ok) {
+      out.replaceChildren(el("div", { className: "err" }, errorText(body, errText)));
+      label = "error";
+    } else {
+      out.replaceChildren(el("pre", {}, body.result || "(empty reply)"));
+      label = body.result.length > 80 ? body.result.slice(0, 80) + "…" : (body.result || "(empty)");
+    }
+    $("history-card").hidden = false;
+    $("history").prepend(el("tr", {},
+      el("td", { style: "padding:6px 8px" }, systemPrompt.length > 60 ? systemPrompt.slice(0, 60) + "…" : systemPrompt),
+      el("td", { style: "padding:6px 8px" }, label),
+      el("td", { style: "padding:6px 8px" }, ms + " ms"),
+    ));
+    send.disabled = false; send.textContent = "Send";
+  }
+
+  send.addEventListener("click", run);
+  sys.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") run(); });
+</script>
+</body>
+</html>

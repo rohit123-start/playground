@@ -7,9 +7,14 @@ import audio_processing
 import file_processing
 import image_processing
 import jev_ai
+import jev_embeddings
 import jev_memory_llm
 import jev_model_picker
+import jev_pipeline
 import jev_prompt_scan
+import jev_query_rewriter
+import jev_reranker
+import jev_summary_updater
 import jev_token_count
 import jev_tool_model_routing
 import video_processing
@@ -29,6 +34,11 @@ app = FastAPI(title="Tool Selector")
 app.include_router(jev_ai.router)  # POST /jev-open-router-tool
 app.include_router(jev_prompt_scan.router)  # POST /jev-prompt-scan-open-router
 app.include_router(jev_memory_llm.router)  # POST /memory-llm
+app.include_router(jev_summary_updater.router)  # POST /summary-updater
+app.include_router(jev_query_rewriter.router)  # POST /query-rewriter
+app.include_router(jev_embeddings.router)  # POST /embeddings-latency, /semantic-search
+app.include_router(jev_reranker.router)  # POST /reranker-compare
+app.include_router(jev_pipeline.router)  # GET /pipeline-corpus, POST /pipeline-test
 app.include_router(jev_model_picker.router)  # POST /jev-model-picker-{low,medium,high}
 app.include_router(jev_token_count.router)  # POST /token-count
 app.include_router(jev_tool_model_routing.router)  # POST /jev-tool-model-routing
@@ -53,6 +63,16 @@ async def playground_memory_llm():
     return _page("playground_memory_llm.html")
 
 
+@app.get("/playground/summary-updater", include_in_schema=False)
+async def playground_summary_updater():
+    return _page("playground_summary_updater.html")
+
+
+@app.get("/playground/query-rewriter", include_in_schema=False)
+async def playground_query_rewriter():
+    return _page("playground_query_rewriter.html")
+
+
 @app.get("/playground/model-picker", include_in_schema=False)
 async def playground_model_picker():
     return _page("playground_model_picker.html")
@@ -61,6 +81,11 @@ async def playground_model_picker():
 @app.get("/playground/token-count", include_in_schema=False)
 async def playground_token_count():
     return _page("playground_token_count.html")
+
+
+@app.get("/playground/embeddings", include_in_schema=False)
+async def playground_embeddings():
+    return _page("playground_embeddings.html")
 
 
 @app.get("/playground/tool-model-routing", include_in_schema=False)
