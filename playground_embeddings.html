@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Embeddings Latency Playground</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --text: #1c1c1a; --muted: #6b6b66; --line: #e2e2dd;
+    --accent: #2f5fd0; --accent-text: #ffffff; --good: #1f7a45; --bad: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --card: #1e1e1c; --text: #ecece8; --muted: #9a9a93; --line: #34342f;
+      --accent: #6c93f0; --accent-text: #10131a; --good: #5fd08a; --bad: #f2877f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; font-weight: 600; margin-bottom: 8px; }
+  textarea { width: 100%; min-height: 140px; resize: vertical; padding: 10px 12px; font: inherit;
+             color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  [hidden] { display: none !important; }
+  .row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+  button.primary { background: var(--accent); color: var(--accent-text); border: 0; border-radius: 8px;
+                   padding: 9px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.primary:disabled { opacity: .6; cursor: default; }
+  .hint { color: var(--muted); font-size: 13px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) { .cols { grid-template-columns: 1fr; } }
+  .side h2 { font-size: 15px; margin: 0 0 2px; }
+  .side .model-id { color: var(--muted); font-size: 12px; margin: 0 0 12px; word-break: break-all; }
+  .latency { font-size: 36px; font-weight: 700; line-height: 1.1; margin: 4px 0 2px; }
+  .latency.bad { color: var(--bad); }
+  .meta { display: flex; gap: 16px; flex-wrap: wrap; margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+  .meta b { color: var(--text); }
+  .run-count { color: var(--muted); font-size: 13px; }
+  .history { font-size: 13px; color: var(--muted); margin-top: 10px; }
+  .history b { color: var(--text); }
+  .err { color: var(--bad); white-space: pre-wrap; word-break: break-word; font-size: 13px; margin-top: 8px; }
+  .delta { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .nav { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+  .nav a { border: 1px solid var(--line); color: var(--text); border-radius: 999px; padding: 4px 14px;
+           font-size: 13px; text-decoration: none; }
+  .nav a[aria-current="page"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <nav class="nav">
+    <a href="/playground">Tool selection</a>
+    <a href="/playground/prompt-scan">Prompt scan (JEV)</a>
+    <a href="/playground/memory-llm">Memory LLM</a>
+    <a href="/playground/model-picker">Model picker (JEV)</a>
+    <a href="/playground/tool-model-routing">Tool model routing (JEV)</a>
+    <a href="/playground/token-count">Token count</a>
+    <a href="/playground/embeddings" aria-current="page">Embeddings</a>
+    <a href="/playground/video-processing">Video processing</a>
+    <a href="/playground/file-processing">File processing</a>
+    <a href="/playground/image-processing">Image processing</a>
+    <a href="/playground/audio-processing">Audio processing</a>
+    <a href="/playground/summary-updater">Summary updater</a>
+    <a href="/playground/query-rewriter">Query rewriter</a>
+  </nav>
+  <h1>Embeddings Latency Playground</h1>
+  <p class="sub">
+    Sends the same text to both embedding models via <code>POST /embeddings-latency</code> and times each:
+    the current local model (<code>BAAI/bge-small-en-v1.5</code>, via fastembed/ONNX, in-process) vs. the
+    candidate hosted model (<code>qwen/qwen3-embedding-8b</code>, via OpenRouter). Run it a few times &mdash;
+    the first call on each side pays a one-time cost (model load locally, cold start on OpenRouter), so look
+    at later runs for the steady-state number.
+  </p>
+
+  <div class="card">
+    <label for="text">Text to embed</label>
+    <textarea id="text" placeholder="Paste the kind of message/fact the memory pipeline would actually embed…">Actually, let's go mobile first instead of web. Also drop the Supabase decision, we haven't picked a backend yet.</textarea>
+    <div class="row">
+      <button class="primary" id="send">Run both</button>
+      <span class="hint">Press Ctrl/Cmd + Enter, or click Run again to compare a warm run</span>
+      <span class="run-count" id="run-count" hidden></span>
+    </div>
+  </div>
+
+  <div class="cols" id="result" hidden>
+    <div class="card side">
+      <h2>Local (current)</h2>
+      <div class="model-id" id="local-model"></div>
+      <div class="latency" id="local-latency"></div>
+      <div class="meta" id="local-meta"></div>
+      <div class="err" id="local-err" hidden></div>
+      <div class="history" id="local-history" hidden></div>
+    </div>
+    <div class="card side">
+      <h2>OpenRouter (candidate)</h2>
+      <div class="model-id" id="or-model"></div>
+      <div class="latency" id="or-latency"></div>
+      <div class="meta" id="or-meta"></div>
+      <div class="err" id="or-err" hidden></div>
+      <div class="history" id="or-history" hidden></div>
+    </div>
+  </div>
+
+  <div class="card" id="delta-card" hidden>
+    <div class="delta" id="delta"></div>
+  </div>
+
+  <div class="card" id="err-card" hidden>
+    <div class="err" id="err"></div>
+  </div>
+
+  <h1>Semantic Search Test</h1>
+  <p class="sub">
+    Embeds one query plus a set of candidate documents with both models, ranks the documents by
+    cosine similarity to the query, and shows each model's ranking side by side &mdash; the question
+    that actually matters for retrieval (<code>app/rag/retrieval.py</code>'s floors), not just latency.
+    The prefilled case mixes a true backend decision, a correction/update of it, an unrelated
+    decision, an unrelated fact, and an unrelated question that superficially overlaps ("backend" vs.
+    "password") to see whether each model keeps it below the relevant hits.
+  </p>
+
+  <div class="card">
+    <label for="sq-query">Query</label>
+    <textarea id="sq-query" style="min-height:48px">What backend are we using?</textarea>
+    <label for="sq-docs" style="margin-top:12px">Candidate documents (one per line)</label>
+    <textarea id="sq-docs" style="min-height:160px">We decided to use Supabase as our backend for now.
+Actually, let's go mobile first instead of web. Also drop the Supabase decision, we haven't picked a backend yet.
+The user's favorite color is blue.
+We haven't picked a database yet, still evaluating Postgres vs DynamoDB.
+How do I reset my Gmail password?
+Ship the v1 release by end of quarter.</textarea>
+    <label for="sq-relevant" style="margin-top:12px">Ground-truth relevant documents (one per line, must match text above exactly)</label>
+    <textarea id="sq-relevant" style="min-height:64px">We decided to use Supabase as our backend for now.
+Actually, let's go mobile first instead of web. Also drop the Supabase decision, we haven't picked a backend yet.</textarea>
+    <div class="row">
+      <button class="primary" id="sq-send">Run search</button>
+      <span class="hint">Ranks are independent per model &mdash; compare the order, not just top score</span>
+    </div>
+  </div>
+
+  <div class="card" id="sq-summary-card" hidden>
+    <label style="margin-bottom:10px">Speed vs. accuracy</label>
+    <table style="width:100%; border-collapse:collapse; font-size:14px;">
+      <thead>
+        <tr style="text-align:left; color:var(--muted); font-size:12px;">
+          <th style="padding:4px 8px 4px 0;">Model</th>
+          <th style="padding:4px 8px;">Latency</th>
+          <th style="padding:4px 8px;">Precision@K</th>
+          <th style="padding:4px 8px;">Perfectly separated?</th>
+        </tr>
+      </thead>
+      <tbody id="sq-summary-body"></tbody>
+    </table>
+    <p class="hint" style="margin:10px 0 0;">
+      Precision@K = share of the top K ranked docs that are truly relevant (K = number of
+      ground-truth docs given). Separated = every relevant doc outranked every irrelevant one.
+    </p>
+  </div>
+
+  <div class="cols" id="sq-result" hidden>
+    <div class="card side">
+      <h2>Local (current)</h2>
+      <div class="model-id" id="sq-local-model"></div>
+      <div class="meta" id="sq-local-latency"></div>
+      <ol id="sq-local-list" style="padding-left:20px; margin:10px 0 0;"></ol>
+      <div class="err" id="sq-local-err" hidden></div>
+    </div>
+    <div class="card side">
+      <h2>OpenRouter (candidate)</h2>
+      <div class="model-id" id="sq-or-model"></div>
+      <div class="meta" id="sq-or-latency"></div>
+      <ol id="sq-or-list" style="padding-left:20px; margin:10px 0 0;"></ol>
+      <div class="err" id="sq-or-err" hidden></div>
+    </div>
+  </div>
+
+  <div class="card" id="sq-err-card" hidden>
+    <div class="err" id="sq-err"></div>
+  </div>
+
+  <h1>Cross-Encoder Reranker Test</h1>
+  <p class="sub">
+    Reranks the same query/documents/ground-truth above &mdash; the stage that sits on top of
+    embedding retrieval, scoring each (query, document) pair jointly instead of by cosine distance
+    alone: the current local cross-encoder (<code>Xenova/ms-marco-MiniLM-L-6-v2</code>, same
+    checkpoint as <code>app/rerank.py</code>) vs. the candidate hosted model
+    (<code>qwen/qwen3-reranker-8b</code>, via OpenRouter's <code>/api/v1/rerank</code>).
+  </p>
+
+  <div class="card">
+    <div class="row">
+      <button class="primary" id="rr-send">Run rerank</button>
+      <span class="hint">Uses the query / documents / relevant docs entered above</span>
+    </div>
+  </div>
+
+  <div class="card" id="rr-summary-card" hidden>
+    <label style="margin-bottom:10px">Speed vs. accuracy</label>
+    <table style="width:100%; border-collapse:collapse; font-size:14px;">
+      <thead>
+        <tr style="text-align:left; color:var(--muted); font-size:12px;">
+          <th style="padding:4px 8px 4px 0;">Model</th>
+          <th style="padding:4px 8px;">Latency</th>
+          <th style="padding:4px 8px;">Precision@K</th>
+          <th style="padding:4px 8px;">Perfectly separated?</th>
+        </tr>
+      </thead>
+      <tbody id="rr-summary-body"></tbody>
+    </table>
+  </div>
+
+  <div class="cols" id="rr-result" hidden>
+    <div class="card side">
+      <h2>Local (current)</h2>
+      <div class="model-id" id="rr-local-model"></div>
+      <div class="meta" id="rr-local-latency"></div>
+      <ol id="rr-local-list" style="padding-left:20px; margin:10px 0 0;"></ol>
+      <div class="err" id="rr-local-err" hidden></div>
+    </div>
+    <div class="card side">
+      <h2>OpenRouter (candidate)</h2>
+      <div class="model-id" id="rr-or-model"></div>
+      <div class="meta" id="rr-or-latency"></div>
+      <ol id="rr-or-list" style="padding-left:20px; margin:10px 0 0;"></ol>
+      <div class="err" id="rr-or-err" hidden></div>
+    </div>
+  </div>
+
+  <div class="card" id="rr-err-card" hidden>
+    <div class="err" id="rr-err"></div>
+  </div>
+
+  <h1>Large-Scale Pipeline Test</h1>
+  <p class="sub">
+    A synthetic ~50-page corpus (150 chunks: unrelated filler, a few near-miss distractors, and
+    exactly 3 true-relevant chunks about one planted fact, scattered at random positions).
+    Semantic search ranks the whole corpus and keeps the top <b>K</b>; the cross-encoder reranks
+    only that shortlist down to the top <b>N</b> &mdash; the actual two-stage pipeline, timed and
+    scored stage-by-stage so a relevant doc that never made the shortlist is visible separately
+    from one that made it but got reranked out.
+  </p>
+
+  <div class="card">
+    <div class="row">
+      <button class="primary" id="pl-load">Generate 50-page corpus</button>
+      <span class="hint" id="pl-corpus-info"></span>
+    </div>
+    <div class="row">
+      <label for="pl-k" style="margin:0; font-weight:400;">Semantic top K</label>
+      <input id="pl-k" type="number" value="20" min="1" style="width:70px; padding:6px 8px; font:inherit; color:var(--text); background:var(--bg); border:1px solid var(--line); border-radius:8px;">
+      <label for="pl-n" style="margin:0; font-weight:400;">Rerank top N</label>
+      <input id="pl-n" type="number" value="3" min="1" style="width:70px; padding:6px 8px; font:inherit; color:var(--text); background:var(--bg); border:1px solid var(--line); border-radius:8px;">
+      <button class="primary" id="pl-send" disabled>Run pipeline</button>
+    </div>
+  </div>
+
+  <div class="card" id="pl-summary-card" hidden>
+    <label style="margin-bottom:10px">Speed vs. accuracy (stage-by-stage)</label>
+    <table style="width:100%; border-collapse:collapse; font-size:14px;">
+      <thead>
+        <tr style="text-align:left; color:var(--muted); font-size:12px;">
+          <th style="padding:4px 8px 4px 0;">Pipeline</th>
+          <th style="padding:4px 8px;">Embed</th>
+          <th style="padding:4px 8px;">Rerank</th>
+          <th style="padding:4px 8px;">Total</th>
+          <th style="padding:4px 8px;">Semantic recall@K</th>
+          <th style="padding:4px 8px;">Final precision@N</th>
+          <th style="padding:4px 8px;">Final recall@N</th>
+        </tr>
+      </thead>
+      <tbody id="pl-summary-body"></tbody>
+    </table>
+  </div>
+
+  <div class="cols" id="pl-result" hidden style="grid-template-columns: 1fr 1fr 1fr;">
+    <div class="card side">
+      <h2>Local</h2>
+      <div class="model-id" id="pl-local-model"></div>
+      <ol id="pl-local-list" style="padding-left:20px; margin:10px 0 0;"></ol>
+      <div class="err" id="pl-local-err" hidden></div>
+    </div>
+    <div class="card side">
+      <h2>Mixed</h2>
+      <div class="model-id" id="pl-mixed-model"></div>
+      <ol id="pl-mixed-list" style="padding-left:20px; margin:10px 0 0;"></ol>
+      <div class="err" id="pl-mixed-err" hidden></div>
+    </div>
+    <div class="card side">
+      <h2>OpenRouter</h2>
+      <div class="model-id" id="pl-or-model"></div>
+      <ol id="pl-or-list" style="padding-left:20px; margin:10px 0 0;"></ol>
+      <div class="err" id="pl-or-err" hidden></div>
+    </div>
+  </div>
+
+  <div class="card" id="pl-err-card" hidden>
+    <div class="err" id="pl-err"></div>
+  </div>
+</main>
+
+<script>
+  // Relative URLs only parse when served over http(s); fall back to the local server if opened as a file.
+  const BASE = location.protocol.startsWith("http") ? "" : "http://localhost:8000";
+  const ROUTE = "/embeddings-latency";
+  const $ = (id) => document.getElementById(id);
+  const text = $("text"), send = $("send");
+
+  let runCount = 0;
+  const localRuns = [];
+  const orRuns = [];
+
+  function errorText(body, errText) {
+    const d = body && body.detail;
+    return d ? (typeof d === "string" ? d : JSON.stringify(d)) : (errText || "Request failed");
+  }
+
+  function renderSide(prefix, side, runs) {
+    runs.push(side.latency_ms);
+    $(`${prefix}-model`).textContent = side.model;
+    if (side.error) {
+      $(`${prefix}-latency`).textContent = `${side.latency_ms.toLocaleString()} ms`;
+      $(`${prefix}-latency`).classList.add("bad");
+      $(`${prefix}-meta`).replaceChildren();
+      $(`${prefix}-err`).hidden = false;
+      $(`${prefix}-err`).textContent = side.error;
+    } else {
+      $(`${prefix}-latency`).classList.remove("bad");
+      $(`${prefix}-latency`).textContent = `${side.latency_ms.toLocaleString()} ms`;
+      $(`${prefix}-meta`).replaceChildren();
+      const dimSpan = document.createElement("span");
+      dimSpan.innerHTML = "Dimensions <b>" + (side.dimensions ?? "?") + "</b>";
+      $(`${prefix}-meta`).append(dimSpan);
+      $(`${prefix}-err`).hidden = true;
+    }
+    if (runs.length > 1) {
+      const hist = $(`${prefix}-history`);
+      hist.hidden = false;
+      const avg = Math.round(runs.reduce((a, b) => a + b, 0) / runs.length);
+      hist.innerHTML = `Runs so far: ${runs.map(n => n.toLocaleString()).join(", ")} ms &mdash; avg <b>${avg.toLocaleString()} ms</b>`;
+    }
+  }
+
+  async function run() {
+    const value = text.value;
+    if (!value.trim()) {
+      $("result").hidden = true;
+      $("delta-card").hidden = true;
+      $("err-card").hidden = true;
+      return;
+    }
+    send.disabled = true;
+    let status = 0, body = null, errText = null;
+    try {
+      const r = await fetch(BASE + ROUTE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: value }),
+      });
+      status = r.status;
+      const raw = await r.text();
+      try { body = JSON.parse(raw); } catch { errText = raw; }
+    } catch (e) {
+      errText = String(e);
+    }
+    const ok = status === 200 && body && body.local && body.openrouter;
+    if (ok) {
+      runCount += 1;
+      $("err-card").hidden = true;
+      $("result").hidden = false;
+      $("run-count").hidden = false;
+      $("run-count").textContent = `Run #${runCount}`;
+      renderSide("local", body.local, localRuns);
+      renderSide("or", body.openrouter, orRuns);
+      if (!body.local.error && !body.openrouter.error) {
+        $("delta-card").hidden = false;
+        const factor = body.local.latency_ms > 0
+          ? (body.openrouter.latency_ms / body.local.latency_ms)
+          : null;
+        const diff = body.openrouter.latency_ms - body.local.latency_ms;
+        $("delta").innerHTML = `OpenRouter took <b>${diff.toLocaleString()} ms</b> longer this run`
+          + (factor ? ` (about <b>${factor.toFixed(1)}x</b> slower).` : ".");
+      } else {
+        $("delta-card").hidden = true;
+      }
+    } else {
+      $("result").hidden = true;
+      $("delta-card").hidden = true;
+      $("err-card").hidden = false;
+      $("err").textContent = errorText(body, errText);
+    }
+    send.disabled = false;
+  }
+
+  send.addEventListener("click", run);
+  text.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") run(); });
+
+  const SQ_ROUTE = "/semantic-search";
+  const sqQuery = $("sq-query"), sqDocs = $("sq-docs"), sqRelevant = $("sq-relevant"), sqSend = $("sq-send");
+  const esc = (s) => s.replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+
+  function renderSearchSide(prefix, side) {
+    $(`${prefix}-model`).textContent = side.model;
+    $(`${prefix}-latency`).innerHTML = `<b>${side.latency_ms.toLocaleString()} ms</b>`;
+    const list = $(`${prefix}-list`);
+    list.replaceChildren();
+    if (side.error) {
+      $(`${prefix}-err`).hidden = false;
+      $(`${prefix}-err`).textContent = side.error;
+      return;
+    }
+    $(`${prefix}-err`).hidden = true;
+    for (const r of side.results) {
+      const li = document.createElement("li");
+      li.style.marginBottom = "6px";
+      const mark = r.relevant ? ` <span style="color:var(--good);font-weight:600;">&#10003; relevant</span>` : "";
+      li.innerHTML = `<b>${r.similarity.toFixed(4)}</b> &mdash; ${esc(r.document)}${mark}`;
+      list.append(li);
+    }
+  }
+
+  function renderSummaryRow(side) {
+    const tr = document.createElement("tr");
+    tr.style.borderTop = "1px solid var(--line)";
+    const latency = `${side.latency_ms.toLocaleString()} ms`;
+    const precision = side.precision_at_k == null ? "&mdash;" : `${Math.round(side.precision_at_k * 100)}%`;
+    const separated = side.perfect_separation == null ? "&mdash;"
+      : side.perfect_separation ? `<span style="color:var(--good);">Yes</span>` : `<span style="color:var(--bad);">No</span>`;
+    tr.innerHTML = `<td style="padding:6px 8px 6px 0;">${side.model}</td>`
+      + `<td style="padding:6px 8px;">${side.error ? "&mdash;" : latency}</td>`
+      + `<td style="padding:6px 8px;">${side.error ? "&mdash;" : precision}</td>`
+      + `<td style="padding:6px 8px;">${side.error ? "&mdash;" : separated}</td>`;
+    return tr;
+  }
+
+  async function runSearch() {
+    const query = sqQuery.value.trim();
+    const documents = sqDocs.value.split("\n").map(s => s.trim()).filter(Boolean);
+    const relevant = sqRelevant.value.split("\n").map(s => s.trim()).filter(Boolean);
+    if (!query || documents.length === 0) return;
+    sqSend.disabled = true;
+    let status = 0, body = null, errText = null;
+    try {
+      const r = await fetch(BASE + SQ_ROUTE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, documents, relevant }),
+      });
+      status = r.status;
+      const raw = await r.text();
+      try { body = JSON.parse(raw); } catch { errText = raw; }
+    } catch (e) {
+      errText = String(e);
+    }
+    const ok = status === 200 && body && body.local && body.openrouter;
+    if (ok) {
+      $("sq-err-card").hidden = true;
+      $("sq-result").hidden = false;
+      $("sq-summary-card").hidden = false;
+      renderSearchSide("sq-local", body.local);
+      renderSearchSide("sq-or", body.openrouter);
+      const summaryBody = $("sq-summary-body");
+      summaryBody.replaceChildren();
+      summaryBody.append(renderSummaryRow(body.local), renderSummaryRow(body.openrouter));
+    } else {
+      $("sq-result").hidden = true;
+      $("sq-summary-card").hidden = true;
+      $("sq-err-card").hidden = false;
+      $("sq-err").textContent = errorText(body, errText);
+    }
+    sqSend.disabled = false;
+  }
+
+  sqSend.addEventListener("click", runSearch);
+
+  const RR_ROUTE = "/reranker-compare";
+  const rrSend = $("rr-send");
+
+  function renderRerankSide(prefix, side) {
+    $(`${prefix}-model`).textContent = side.model;
+    $(`${prefix}-latency`).innerHTML = `<b>${side.latency_ms.toLocaleString()} ms</b>`;
+    const list = $(`${prefix}-list`);
+    list.replaceChildren();
+    if (side.error) {
+      $(`${prefix}-err`).hidden = false;
+      $(`${prefix}-err`).textContent = side.error;
+      return;
+    }
+    $(`${prefix}-err`).hidden = true;
+    for (const r of side.results) {
+      const li = document.createElement("li");
+      li.style.marginBottom = "6px";
+      const mark = r.relevant ? ` <span style="color:var(--good);font-weight:600;">&#10003; relevant</span>` : "";
+      li.innerHTML = `<b>${r.score}</b> &mdash; ${esc(r.document)}${mark}`;
+      list.append(li);
+    }
+  }
+
+  async function runRerank() {
+    const query = sqQuery.value.trim();
+    const documents = sqDocs.value.split("\n").map(s => s.trim()).filter(Boolean);
+    const relevant = sqRelevant.value.split("\n").map(s => s.trim()).filter(Boolean);
+    if (!query || documents.length === 0) return;
+    rrSend.disabled = true;
+    let status = 0, body = null, errText = null;
+    try {
+      const r = await fetch(BASE + RR_ROUTE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, documents, relevant }),
+      });
+      status = r.status;
+      const raw = await r.text();
+      try { body = JSON.parse(raw); } catch { errText = raw; }
+    } catch (e) {
+      errText = String(e);
+    }
+    const ok = status === 200 && body && body.local && body.openrouter;
+    if (ok) {
+      $("rr-err-card").hidden = true;
+      $("rr-result").hidden = false;
+      $("rr-summary-card").hidden = false;
+      renderRerankSide("rr-local", body.local);
+      renderRerankSide("rr-or", body.openrouter);
+      const summaryBody = $("rr-summary-body");
+      summaryBody.replaceChildren();
+      summaryBody.append(renderSummaryRow(body.local), renderSummaryRow(body.openrouter));
+    } else {
+      $("rr-result").hidden = true;
+      $("rr-summary-card").hidden = true;
+      $("rr-err-card").hidden = false;
+      $("rr-err").textContent = errorText(body, errText);
+    }
+    rrSend.disabled = false;
+  }
+
+  rrSend.addEventListener("click", runRerank);
+
+  const PL_CORPUS_ROUTE = "/pipeline-corpus";
+  const PL_TEST_ROUTE = "/pipeline-test";
+  const plLoad = $("pl-load"), plSend = $("pl-send"), plK = $("pl-k"), plN = $("pl-n");
+  let plCorpus = null;
+
+  async function loadCorpus() {
+    plLoad.disabled = true;
+    try {
+      const r = await fetch(BASE + PL_CORPUS_ROUTE);
+      plCorpus = await r.json();
+      $("pl-corpus-info").textContent =
+        `Loaded ${plCorpus.documents.length} chunks across ${plCorpus.pages} pages, ${plCorpus.relevant.length} truly relevant to "${plCorpus.query}"`;
+      plSend.disabled = false;
+    } catch (e) {
+      $("pl-corpus-info").textContent = `Failed to load corpus: ${e}`;
+    }
+    plLoad.disabled = false;
+  }
+
+  function renderPipelineSide(prefix, side) {
+    $(`${prefix}-model`).textContent = `${side.embed_model} + ${side.rerank_model}`;
+    const list = $(`${prefix}-list`);
+    list.replaceChildren();
+    if (side.error) {
+      $(`${prefix}-err`).hidden = false;
+      $(`${prefix}-err`).textContent = side.error;
+      return;
+    }
+    $(`${prefix}-err`).hidden = true;
+    for (const r of side.final_results) {
+      const li = document.createElement("li");
+      li.style.marginBottom = "6px";
+      const mark = r.relevant ? ` <span style="color:var(--good);font-weight:600;">&#10003; relevant</span>` : "";
+      li.innerHTML = `rerank <b>${r.rerank_score}</b> (semantic ${r.semantic_similarity}) &mdash; ${esc(r.document)}${mark}`;
+      list.append(li);
+    }
+  }
+
+  function renderPipelineSummaryRow(label, side) {
+    const tr = document.createElement("tr");
+    tr.style.borderTop = "1px solid var(--line)";
+    const pct = (v) => v == null ? "&mdash;" : `${Math.round(v * 100)}%`;
+    const cells = side.error
+      ? [`${label}`, "&mdash;", "&mdash;", "&mdash;", "&mdash;", "&mdash;", "&mdash;"]
+      : [
+          label,
+          `${side.embed_latency_ms.toLocaleString()} ms`,
+          `${side.rerank_latency_ms.toLocaleString()} ms`,
+          `${side.total_latency_ms.toLocaleString()} ms`,
+          pct(side.semantic_recall_at_k),
+          pct(side.final_precision),
+          pct(side.final_recall),
+        ];
+    tr.innerHTML = cells.map((c, i) => `<td style="padding:6px 8px${i === 0 ? " 6px 0" : ""};">${c}</td>`).join("");
+    return tr;
+  }
+
+  async function runPipeline() {
+    if (!plCorpus) return;
+    plSend.disabled = true;
+    const semantic_top_k = parseInt(plK.value, 10) || 20;
+    const rerank_top_k = parseInt(plN.value, 10) || 3;
+    let status = 0, body = null, errText = null;
+    try {
+      const r = await fetch(BASE + PL_TEST_ROUTE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: plCorpus.query, documents: plCorpus.documents, relevant: plCorpus.relevant,
+          semantic_top_k, rerank_top_k,
+        }),
+      });
+      status = r.status;
+      const raw = await r.text();
+      try { body = JSON.parse(raw); } catch { errText = raw; }
+    } catch (e) {
+      errText = String(e);
+    }
+    const ok = status === 200 && body && body.local && body.openrouter && body.mixed;
+    if (ok) {
+      $("pl-err-card").hidden = true;
+      $("pl-result").hidden = false;
+      $("pl-summary-card").hidden = false;
+      renderPipelineSide("pl-local", body.local);
+      renderPipelineSide("pl-mixed", body.mixed);
+      renderPipelineSide("pl-or", body.openrouter);
+      const summaryBody = $("pl-summary-body");
+      summaryBody.replaceChildren();
+      summaryBody.append(
+        renderPipelineSummaryRow("Local (bge + Xenova)", body.local),
+        renderPipelineSummaryRow("Mixed (bge + qwen3-reranker)", body.mixed),
+        renderPipelineSummaryRow("OpenRouter (qwen3 + qwen3)", body.openrouter),
+      );
+    } else {
+      $("pl-result").hidden = true;
+      $("pl-summary-card").hidden = true;
+      $("pl-err-card").hidden = false;
+      $("pl-err").textContent = errorText(body, errText);
+    }
+    plSend.disabled = false;
+  }
+
+  plLoad.addEventListener("click", loadCorpus);
+  plSend.addEventListener("click", runPipeline);
+</script>
+</body>
+</html>
